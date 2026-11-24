@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
 import { AGENT_MODEL_COOKIE, getConnectedAgentModel } from "@/lib/agent-model-connection";
+import { getFreeAgentModel } from "@/lib/agent-models";
 
 export const maxDuration = 60;
 
@@ -114,7 +115,7 @@ ${formattedHistory ? formattedHistory : "None (this is the start of the conversa
 `;
 
     const { text: rawOutput } = await generateText({
-      model: modelId,
+      model: getFreeAgentModel(modelId),
       system: systemPrompt,
       prompt: message.trim(),
       maxOutputTokens: 1200,

@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { isFreeAgentModel } from "@/lib/agent-models";
+import { getFreeAgentModel, isFreeAgentModel } from "@/lib/agent-models";
 import { AGENT_MODEL_COOKIE, AGENT_MODEL_COOKIE_MAX_AGE, createAgentModelCookieValue } from "@/lib/agent-model-connection";
 
 export const maxDuration = 30;
@@ -20,7 +20,7 @@ export async function POST(request) {
     }
 
     await generateText({
-      model: modelId,
+      model: getFreeAgentModel(modelId),
       prompt: "Reply with the single word READY.",
       maxOutputTokens: 8,
       abortSignal: AbortSignal.timeout(20_000),

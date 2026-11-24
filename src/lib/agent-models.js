@@ -1,3 +1,5 @@
+import { gateway } from "ai";
+
 export const FREE_AGENT_MODELS = [
   {
     id: "nvidia/nemotron-3.5-lightning-free",
@@ -11,4 +13,12 @@ const FREE_AGENT_MODEL_IDS = new Set(FREE_AGENT_MODELS.map((model) => model.id))
 
 export function isFreeAgentModel(modelId) {
   return typeof modelId === "string" && FREE_AGENT_MODEL_IDS.has(modelId);
+}
+
+export function getFreeAgentModel(modelId) {
+  if (!isFreeAgentModel(modelId)) {
+    throw new Error("Choose an available free model.");
+  }
+
+  return gateway(modelId);
 }
