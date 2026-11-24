@@ -28,9 +28,13 @@ import {
   FiCalendar, 
   FiSend, 
   FiInfo,
-  FiCheckCircle
+  FiCheckCircle,
+  FiFilm,
+  FiSettings,
 } from "react-icons/fi";
 import PostComposerModal from "@/components/composer/PostComposerModal";
+import MediaGeneratorModal from "@/components/media/MediaGeneratorModal";
+import AgentConnectionDialog from "@/components/agent/AgentConnectionDialog";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -325,6 +329,9 @@ export default function AgentWorkspace() {
   // Composer Modal Integration
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerInitialPost, setComposerInitialPost] = useState(null);
+  const [mediaGeneratorOpen, setMediaGeneratorOpen] = useState(false);
+  const [agentConnectionOpen, setAgentConnectionOpen] = useState(false);
+  const [providerConfig, setProviderConfig] = useState(null);
 
   const messagesEndRef = useRef(null);
 
@@ -577,6 +584,7 @@ export default function AgentWorkspace() {
           selectedChannels,
           targetChannels: selectedChannels,
           threadId: activeThreadId,
+          ...(providerConfig ? { providerConfig } : {}),
         }),
       });
 
@@ -749,7 +757,7 @@ export default function AgentWorkspace() {
                   </h1>
                   <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                    Active
+                    {providerConfig ? "External" : "Built-in"}
                   </span>
                 </div>
                 {/* Active Channel Pills */}
@@ -773,15 +781,33 @@ export default function AgentWorkspace() {
               </div>
             </div>
 
-            {/* Quick Action: New Chat */}
-            <button
-              type="button"
-              onClick={handleNewThread}
-              className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-            >
-              <FiPlus className="text-xs text-[#612bd3] dark:text-[#8c66ff]" />
-              <span>New Chat</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAgentConnectionOpen(true)}
+                aria-label={providerConfig ? `Connected model: ${providerConfig.model}` : "Connect an external AI agent"}
+                className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FiSettings className="text-xs" />
+                <span>{providerConfig ? providerConfig.model : "Connect agent"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaGeneratorOpen(true)}
+                className="px-2.5 py-1 rounded-md bg-[#612bd3]/10 hover:bg-[#612bd3]/15 border border-[#612bd3]/20 text-xs font-medium text-[#612bd3] dark:text-[#a88aff] flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FiFilm className="text-xs" />
+                <span>Generate media</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleNewThread}
+                className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FiPlus className="text-xs text-[#612bd3] dark:text-[#8c66ff]" />
+                <span>New Chat</span>
+              </button>
+            </div>
           </div>
 
           {/* Messages Scroll Area */}
@@ -1002,6 +1028,33 @@ export default function AgentWorkspace() {
           </div>
         </aside>
       </div>
+
+      <AgentConnectionDialog
+        key={agentConnectionOpen ? JSON.stringify(providerConfig) : "closed"}
+        isOpen={agentConnectionOpen}
+        initialConfig={providerConfig}
+        onClose={() => setAgentConnectionOpen(false)}
+        onSave={setProviderConfig}
+      />
+
+      <MediaGeneratorModal
+        isOpen={mediaGeneratorOpen}
+        onClose={() => setMediaGeneratorOpen(false)}
+        onSaved={({ url }) => {
+          const proposal = [...messages].reverse().find((item) => item.postProposal)?.postProposal;
+          const platforms = (proposal?.platforms || selectedChannels).filter((platform) => platform !== "meta_ads");
+          setComposerInitialPost({
+            platform: platforms[0] || "instagram",
+            title: proposal?.title || "",
+            description: proposal?.description || "",
+            tags: proposal?.tags || "",
+            platforms: platforms.length > 0 ? platforms : ["instagram"],
+            mediaUrl: url,
+          });
+          setMediaGeneratorOpen(false);
+          setComposerOpen(true);
+        }}
+      />
 
       {/* Post Composer Modal Integration */}
       {composerOpen && (
