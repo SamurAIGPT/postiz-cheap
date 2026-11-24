@@ -15,7 +15,8 @@ import {
   FaCheck, 
   FaClock, 
   FaBolt, 
-  FaShareAlt 
+  FaShareAlt,
+  FaBullhorn,
 } from "react-icons/fa";
 import { FaXTwitter, FaThreads } from "react-icons/fa6";
 import { SiTiktok } from "react-icons/si";
@@ -40,6 +41,7 @@ const PLATFORM_ICONS = {
   instagram: { name: "Instagram", Icon: FaInstagram, color: "text-pink-500", bg: "bg-pink-500/10 border-pink-500/30 text-pink-400" },
   x_twitter: { name: "X (Twitter)", Icon: FaXTwitter, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-400/30 text-sky-400" },
   facebook: { name: "Facebook", Icon: FaFacebook, color: "text-blue-600", bg: "bg-blue-600/10 border-blue-600/30 text-blue-400" },
+  meta_ads: { name: "Meta Ads", Icon: FaBullhorn, color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/30 text-blue-400" },
   linkedin: { name: "LinkedIn", Icon: FaLinkedin, color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/30 text-blue-400" },
   threads: { name: "Threads", Icon: FaThreads, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-400/30 text-purple-400" },
   pinterest: { name: "Pinterest", Icon: FaPinterest, color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/30 text-rose-400" },
@@ -399,9 +401,11 @@ export default function AgentWorkspace() {
             // Save cleaned and extracted version back to localStorage
             localStorage.setItem("social_agent_threads", JSON.stringify(parsed));
 
-            setThreads(parsed);
-            setActiveThreadId(parsed[0].id);
-            setMessages(parsed[0].messages || []);
+            queueMicrotask(() => {
+              setThreads(parsed);
+              setActiveThreadId(parsed[0].id);
+              setMessages(parsed[0].messages || []);
+            });
             return;
           }
         }
@@ -422,16 +426,18 @@ export default function AgentWorkspace() {
           },
         ],
       };
-      setThreads([newThread]);
-      setActiveThreadId(newThread.id);
-      setMessages(newThread.messages);
+      queueMicrotask(() => {
+        setThreads([newThread]);
+        setActiveThreadId(newThread.id);
+        setMessages(newThread.messages);
+      });
       localStorage.setItem("social_agent_threads", JSON.stringify([newThread]));
     }
   }, []);
 
   useEffect(() => {
     if (status === "authenticated") {
-      fetchAccounts();
+      queueMicrotask(fetchAccounts);
     }
   }, [status, fetchAccounts]);
 
@@ -533,7 +539,7 @@ export default function AgentWorkspace() {
 
     // Append user message
     const userMsg = {
-      id: "msg_" + Date.now(),
+      id: `msg_${messages.length + 1}`,
       role: "user",
       content: textToSend,
       createdAt: new Date().toISOString(),
@@ -583,7 +589,7 @@ export default function AgentWorkspace() {
       const assistantReply = data.reply || "I have analyzed your request. How else can I assist your social strategy?";
 
       const assistantMsg = {
-        id: "msg_" + Date.now(),
+        id: `msg_${newMessages.length + 1}`,
         role: "assistant",
         content: assistantReply,
         postProposal: data.postProposal || null,
@@ -604,12 +610,18 @@ export default function AgentWorkspace() {
 
   // Open Proposed Post in Composer
   const handleOpenProposalInComposer = (proposal) => {
+    const platforms = (proposal.platforms || selectedChannels).filter((platform) => platform !== "meta_ads");
+    if (platforms.length === 0) {
+      setErrorMsg("Meta Ads campaign publishing is not available from the post scheduler.");
+      return;
+    }
+
     setComposerInitialPost({
-      platform: proposal.platforms?.[0] || "youtube",
+      platform: platforms[0] || "youtube",
       title: proposal.title || "",
       description: proposal.description || "",
       tags: proposal.tags || "",
-      platforms: proposal.platforms || selectedChannels,
+      platforms,
     });
     setComposerOpen(true);
   };
