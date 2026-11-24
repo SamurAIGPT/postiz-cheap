@@ -302,7 +302,7 @@ function PostProposalCard({ proposal, index, total, onOpenComposer }) {
   );
 }
 
-const DEFAULT_WELCOME = `Hello! I am your AI Social Media Marketing Agent with persistent context memory.
+const DEFAULT_WELCOME = `Hello! I am your AI Social Media Marketing Agent, ready to create social content once a free model is connected.
 
 ### What I can do for you:
 - ✍️ **Craft Viral Copy**: Generate high-converting hooks, descriptions, and hashtags.
@@ -448,6 +448,17 @@ export default function AgentWorkspace() {
     }
   }, [status, fetchAccounts]);
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const savedModel = sessionStorage.getItem("social_agent_model");
+        if (savedModel) setProviderConfig({ model: savedModel });
+      } catch {
+        setProviderConfig(null);
+      }
+    });
+  }, []);
+
   // Save current messages to active thread
   const updateThreadMessages = (threadId, newMessages, customTitle = null) => {
     setThreads((prev) => {
@@ -538,6 +549,11 @@ export default function AgentWorkspace() {
 
   // Send message to Agent
   const handleSendMessage = async (customText = null) => {
+    if (!providerConfig?.model) {
+      setAgentConnectionOpen(true);
+      return;
+    }
+
     const textToSend = (customText || inputText).trim();
     if (!textToSend || isThinking) return;
 
@@ -584,7 +600,6 @@ export default function AgentWorkspace() {
           selectedChannels,
           targetChannels: selectedChannels,
           threadId: activeThreadId,
-          ...(providerConfig ? { providerConfig } : {}),
         }),
       });
 
@@ -757,7 +772,7 @@ export default function AgentWorkspace() {
                   </h1>
                   <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                    {providerConfig ? "External" : "Built-in"}
+                    {providerConfig ? "Free model connected" : "Model not connected"}
                   </span>
                 </div>
                 {/* Active Channel Pills */}
@@ -785,15 +800,15 @@ export default function AgentWorkspace() {
               <button
                 type="button"
                 onClick={() => setAgentConnectionOpen(true)}
-                aria-label={providerConfig ? `Connected model: ${providerConfig.model}` : "Connect an external AI agent"}
+                aria-label={providerConfig ? `Connected model: ${providerConfig.model}` : "Connect a free AI model"}
                 className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <FiSettings className="text-xs" />
-                <span>{providerConfig ? providerConfig.model : "Connect agent"}</span>
+                <span>{providerConfig ? providerConfig.model : "Connect free model"}</span>
               </button>
               <button
                 type="button"
-                onClick={() => setMediaGeneratorOpen(true)}
+                onClick={() => providerConfig ? setMediaGeneratorOpen(true) : setAgentConnectionOpen(true)}
                 className="px-2.5 py-1 rounded-md bg-[#612bd3]/10 hover:bg-[#612bd3]/15 border border-[#612bd3]/20 text-xs font-medium text-[#612bd3] dark:text-[#a88aff] flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <FiFilm className="text-xs" />
@@ -933,7 +948,7 @@ export default function AgentWorkspace() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                     e.preventDefault();
                     handleSendMessage();
                   }
@@ -1034,11 +1049,19 @@ export default function AgentWorkspace() {
         isOpen={agentConnectionOpen}
         initialConfig={providerConfig}
         onClose={() => setAgentConnectionOpen(false)}
-        onSave={setProviderConfig}
+        onSave={(model) => {
+          setProviderConfig({ model });
+          try {
+            sessionStorage.setItem("social_agent_model", model);
+          } catch {
+            setErrorMsg("The model connected, but this browser could not remember the connection for this tab.");
+          }
+        }}
       />
 
       <MediaGeneratorModal
         isOpen={mediaGeneratorOpen}
+        agentModel={providerConfig?.model || ""}
         onClose={() => setMediaGeneratorOpen(false)}
         onSaved={({ url }) => {
           const proposal = [...messages].reverse().find((item) => item.postProposal)?.postProposal;

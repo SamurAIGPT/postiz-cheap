@@ -66,7 +66,7 @@ export default function AppShell({ children }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
+    queueMicrotask(() => setMobileMenuOpen(false));
   }, [pathname]);
 
   // Fetch connected channels for top bar indicator
@@ -141,6 +141,34 @@ export default function AppShell({ children }) {
   };
 
   const credits = session?.user?.credits ?? 10;
+
+  if (status === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f1f2f5] p-6 text-sm text-zinc-500 dark:bg-[#0e0e0e] dark:text-zinc-400" aria-live="polite">
+        Checking your sign-in…
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f1f2f5] p-6 text-zinc-900 dark:bg-[#0e0e0e] dark:text-white">
+        <section className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-7 text-center shadow-xl dark:border-zinc-800 dark:bg-[#171717]">
+          <StudioBrandLogo className="mx-auto mb-5 size-12" />
+          <h1 className="text-xl font-bold tracking-tight">Sign in to your studio</h1>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">Use your authorized Google account to access your channels, campaigns, and media.</p>
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl: pathname === "/login" ? "/" : pathname || "/" })}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#612bd3] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#7237e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#612bd3] focus-visible:ring-offset-2"
+          >
+            <FaGoogle aria-hidden="true" />
+            Sign in with Google
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="fixed inset-0 flex bg-[#f1f2f5] dark:bg-[#0e0e0e] text-slate-900 dark:text-white p-2 sm:p-2.5 font-sans overflow-hidden select-none transition-colors duration-200">
