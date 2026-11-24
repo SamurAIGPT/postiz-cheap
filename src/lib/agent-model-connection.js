@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { isFreeAgentModel } from "@/lib/agent-models";
+import { AGENT_MODEL_ID, isSupportedAgentModel } from "@/lib/agent-model-config";
 
 export const AGENT_MODEL_COOKIE = "v0-agent-model";
 export const AGENT_MODEL_COOKIE_MAX_AGE = 60 * 60 * 12;
@@ -17,8 +17,8 @@ function signPayload(payload) {
 
 export function createAgentModelCookieValue(user, modelId) {
   const subject = getUserIdentity(user);
-  if (!subject || !isFreeAgentModel(modelId)) {
-    throw new Error("The signed-in user or free model is invalid.");
+  if (!subject || modelId !== AGENT_MODEL_ID) {
+    throw new Error("The signed-in user or AI Gateway model is invalid.");
   }
 
   const payload = Buffer.from(JSON.stringify({
@@ -44,7 +44,7 @@ export function getConnectedAgentModel(cookieValue, user) {
     if (
       connection.sub !== getUserIdentity(user) ||
       !Number.isInteger(connection.exp) || connection.exp <= Math.floor(Date.now() / 1000) ||
-      !isFreeAgentModel(connection.modelId)
+      !isSupportedAgentModel(connection.modelId)
     ) return null;
 
     return connection.modelId;
