@@ -36,7 +36,7 @@ import {
 import PostComposerModal from "@/components/composer/PostComposerModal";
 import MediaGeneratorModal from "@/components/media/MediaGeneratorModal";
 import AgentConnectionDialog from "@/components/agent/AgentConnectionDialog";
-import { AGENT_MODEL_ID, AGENT_MODELS } from "@/lib/agent-model-config";
+import { AGENT_MODELS } from "@/lib/agent-model-config";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -416,16 +416,6 @@ export default function AgentWorkspace() {
     }
   }, [status, fetchAccounts]);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      try {
-        const savedModel = sessionStorage.getItem("social_agent_model");
-        if (savedModel) setProviderConfig({ model: AGENT_MODEL_ID });
-      } catch {
-        setProviderConfig(null);
-      }
-    });
-  }, []);
 
   // Save current messages to active thread
   const updateThreadMessages = (threadId, newMessages, customTitle = null) => {
@@ -515,10 +505,21 @@ export default function AgentWorkspace() {
     });
   };
 
+  const openAgentConnection = async () => {
+    try {
+      const response = await fetch("/api/agent/connect");
+      const payload = await response.json();
+      setProviderConfig(response.ok && payload.connected ? { model: payload.modelId } : null);
+    } catch {
+      setProviderConfig(null);
+    }
+    setAgentConnectionOpen(true);
+  };
+
   // Send message to Agent
   const handleSendMessage = async (customText = null) => {
     if (!providerConfig?.model) {
-      setAgentConnectionOpen(true);
+      await openAgentConnection();
       return;
     }
 
@@ -769,7 +770,7 @@ export default function AgentWorkspace() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setAgentConnectionOpen(true)}
+                onClick={openAgentConnection}
                 aria-label={providerConfig ? `Connected model: ${connectedModelName}` : "Connect the AI model"}
                 className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
@@ -780,7 +781,7 @@ export default function AgentWorkspace() {
                 type="button"
                 onClick={() => {
                   if (!providerConfig) {
-                    setAgentConnectionOpen(true);
+                    openAgentConnection();
                     return;
                   }
                   setMediaPrompt("");
@@ -1038,11 +1039,6 @@ export default function AgentWorkspace() {
         onClose={() => setAgentConnectionOpen(false)}
         onSave={(model) => {
           setProviderConfig({ model });
-          try {
-            sessionStorage.setItem("social_agent_model", model);
-          } catch {
-            setErrorMsg("The model connected, but this browser could not remember the connection for this tab.");
-          }
         }}
       />
 

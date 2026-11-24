@@ -104,6 +104,7 @@ ${metaOnlySelected
       : ""}`;
 
     const response = await generateAgentResponse({
+      modelId,
       instructions,
       prompt: message.trim(),
       maxOutputTokens: 900,
