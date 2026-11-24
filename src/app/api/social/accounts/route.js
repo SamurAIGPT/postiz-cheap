@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import config from "@/lib/config";
 import { SocialAccountStore, PLATFORMS_CONFIG } from "@/lib/integrations/social-manager";
+import { listMetaAdAccounts, UserAuthorizationRequiredError } from "@/lib/integrations/meta-ads";
 
 const PLATFORM_ID_MAP = {
   youtube: 1,
@@ -12,6 +13,7 @@ const PLATFORM_ID_MAP = {
   x_twitter: 4,
   twitter: 4,
   facebook: 5,
+  meta_ads: 9,
   linkedin: 6,
   threads: 7,
   pinterest: 8
@@ -93,10 +95,19 @@ export async function GET(req) {
       }
     }
 
-    // 3. If no remote accounts found, provide the local SocialAccountStore accounts
+    // Meta Ads accounts use a per-user Vercel Connect token and never enter the social-account store.
+    try {
+      const metaAccounts = await listMetaAdAccounts(session);
+      accounts.push(...metaAccounts);
+    } catch (error) {
+      if (!(error instanceof UserAuthorizationRequiredError)) {
+        console.warn("Meta Ads accounts are temporarily unavailable.");
+      }
+    }
+
+    // 3. If no remote accounts were found, preserve the local demo accounts.
     if (accounts.length === 0) {
-      const fallback = SocialAccountStore.getAll();
-      return NextResponse.json(fallback);
+      return NextResponse.json(SocialAccountStore.getAll());
     }
 
     return NextResponse.json(accounts);
