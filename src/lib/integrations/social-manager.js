@@ -76,6 +76,20 @@ export const PLATFORMS_CONFIG = {
     bgColor: "bg-blue-500/10 border-blue-500/30 text-blue-400",
     description: "Publish posts, photos, and Reels to Facebook Pages and Groups."
   },
+  meta_ads: {
+    key: "meta_ads",
+    platformId: 9,
+    name: "Meta Ads",
+    category: "Paid Advertising",
+    charLimit: 0,
+    mediaTypes: [],
+    defaultPrivacy: "",
+    privacyOptions: [],
+    hasTags: false,
+    color: "text-blue-500",
+    bgColor: "bg-blue-500/10 border-blue-500/30 text-blue-400",
+    description: "Connect Meta ad accounts and draft campaign concepts. Campaigns are not launched from this channel."
+  },
   linkedin: {
     key: "linkedin",
     platformId: 6,

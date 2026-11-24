@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import MediaGrid from "@/components/media/MediaGrid";
 import MediaUploaderModal from "@/components/media/MediaUploaderModal";
+import MediaGeneratorModal from "@/components/media/MediaGeneratorModal";
 import ImageCropperModal from "@/components/media/ImageCropperModal";
 import PostComposerModal from "@/components/composer/PostComposerModal";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -47,6 +48,7 @@ export default function MediaPage() {
 
   // Modals state
   const [uploaderOpen, setUploaderOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperTargetAsset, setCropperTargetAsset] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -158,6 +160,16 @@ export default function MediaPage() {
               title="Refresh Media Library"
             >
               <FiRefreshCw className={`text-xs ${loading ? "animate-spin text-[#612bd3]" : ""}`} />
+            </button>
+
+            {/* Generate Media Button */}
+            <button
+              type="button"
+              onClick={() => setGeneratorOpen(true)}
+              className="px-4 py-2 rounded-xl border border-[#612bd3]/30 bg-[#612bd3]/5 hover:bg-[#612bd3]/10 text-[#612bd3] dark:text-[#a78bfa] text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0"
+            >
+              <FiImage className="text-sm" />
+              <span>Generate Media</span>
             </button>
 
             {/* Upload Media Button */}
@@ -365,6 +377,12 @@ export default function MediaPage() {
         existingFolders={folders.map((f) => f.name)}
         currentFolder={activeFolder}
         onUploadComplete={fetchMedia}
+      />
+
+      <MediaGeneratorModal
+        isOpen={generatorOpen}
+        onClose={() => setGeneratorOpen(false)}
+        onSaved={fetchMedia}
       />
 
       {/* Image Cropper Modal */}

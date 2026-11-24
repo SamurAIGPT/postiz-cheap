@@ -51,8 +51,8 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
 
     try {
-      const post = await prisma.scheduledPost.findUnique({
-        where: { id }
+      const post = await prisma.scheduledPost.findFirst({
+        where: { id, userId: session.user.id }
       });
 
       if (post) {
@@ -168,6 +168,16 @@ export async function PATCH(req, { params }) {
 
         if (body.title !== undefined) updateData.title = body.title;
         if (body.description !== undefined) updateData.description = body.description;
+        if (body.mediaUrl !== undefined) updateData.mediaUrl = body.mediaUrl;
+        if (body.platform !== undefined) updateData.platform = body.platform;
+        if (body.accountName !== undefined) updateData.accountName = body.accountName;
+        if (body.accountId !== undefined) {
+          const accountId = Number(body.accountId);
+          if (!Number.isInteger(accountId) || accountId <= 0) {
+            return NextResponse.json({ error: "Choose a valid social account." }, { status: 400 });
+          }
+          updateData.accountId = accountId;
+        }
         if (body.privacy !== undefined) updateData.privacy = body.privacy;
         if (body.customTag !== undefined) updateData.customTag = body.customTag;
         if (body.tagColor !== undefined) updateData.tagColor = body.tagColor;
