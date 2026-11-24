@@ -9,8 +9,7 @@ import {
 
 export const META_ADS_CONNECTOR_UID = "facebook.com/meta-ads-accounts";
 export const META_ADS_PLATFORM_ID = 9;
-export const META_ADS_READ_SCOPES = ["ads_read"];
-export const META_ADS_AUTH_SCOPES = ["ads_read", "ads_management"];
+export const META_ADS_SCOPES = ["ads_read"];
 const META_GRAPH_ORIGIN = "https://graph.facebook.com";
 const META_GRAPH_VERSION = "v27.0";
 
@@ -70,7 +69,7 @@ export async function startMetaAdsAuthorization(session) {
   const origin = await getCallbackOrigin();
   const authorization = await startAuthorization(
     META_ADS_CONNECTOR_UID,
-    { subject: getSubject(session), scopes: META_ADS_AUTH_SCOPES },
+    { subject: getSubject(session), scopes: META_ADS_SCOPES },
     { callbackUrl: `${origin}/integrations?meta=connected` }
   );
 
@@ -80,7 +79,7 @@ export async function startMetaAdsAuthorization(session) {
 export async function getMetaAdsAccessToken(session) {
   return getToken(META_ADS_CONNECTOR_UID, {
     subject: getSubject(session),
-    scopes: META_ADS_READ_SCOPES,
+    scopes: META_ADS_SCOPES,
   });
 }
 
