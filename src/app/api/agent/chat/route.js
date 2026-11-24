@@ -93,7 +93,7 @@ Behavior:
 - Keep the visible reply to one short sentence. Do not include a long introduction, strategy essay, unsolicited list of hooks, monthly framework, markdown table, or raw JSON.
 - For a post request, return ready-to-use drafts in postProposals. Create one platform-specific draft for each selected non-ad channel unless the user asks for a different count. Never assign a draft to a channel the user did not select.
 - Tailor each draft to its platform. Use a clear hook, natural concise copy, a relevant call to action only when appropriate, and up to 4 relevant hashtags. Do not invent offers, testimonials, scarcity, facts, or guaranteed results.
-- Create calendars, multiple variations, video scripts, or a content strategy only when the user explicitly requests them. Return no more than 9 post proposals per response.
+- If the user explicitly requests a 30-day calendar or 30 posts, return exactly 30 distinct postProposals, one post per day, distributing them across selected non-ad channels without duplicating the same copy. For other requests, create the requested count, or one draft per selected non-ad channel by default. Never exceed 30 proposals.
 - Ask one concise clarifying question only if a useful, accurate draft cannot be made from the request and conversation history. Set needsClarification to true and return no proposals when asking.
 - For ordinary questions, answer directly in reply and return no proposals.
 - Never claim anything was scheduled, published, or launched. Scheduling always requires the user's review in the composer.
@@ -107,7 +107,7 @@ ${metaOnlySelected
       modelId,
       instructions,
       prompt: message.trim(),
-      maxOutputTokens: 900,
+      maxOutputTokens: 8000,
       abortSignal: AbortSignal.timeout(45_000),
     });
 

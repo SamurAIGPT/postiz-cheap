@@ -240,7 +240,7 @@ function PostProposalCard({ proposal, index, total, onOpenComposer, onGenerateMe
     <div className="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 transition-colors dark:border-[#262525] dark:bg-[#181717]">
       <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5 dark:border-[#252525]">
         <span className="text-[10px] font-bold uppercase tracking-wider text-[#612bd3] dark:text-[#8c66ff]">
-          {total > 1 ? `Draft ${index + 1}` : "Ready-to-review draft"}
+          {proposal.id ? "Saved draft" : "Draft · Not saved"}{total > 1 ? ` ${index + 1}/${total}` : ""}
         </span>
         <div className="flex items-center gap-1" aria-label="Draft platforms">
           {proposal.platforms?.map((pKey) => {
@@ -259,6 +259,11 @@ function PostProposalCard({ proposal, index, total, onOpenComposer, onGenerateMe
       {proposal.title && <p className="text-xs font-semibold text-zinc-900 dark:text-white">{proposal.title}</p>}
       {proposal.description && <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">{proposal.description}</p>}
       {proposal.tags && <p className="text-[11px] text-sky-600 dark:text-sky-400">{proposal.tags}</p>}
+      {proposal.scheduledAt && (
+        <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+          Suggested draft date: {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(proposal.scheduledAt))} · Not scheduled
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-2 dark:border-[#252525]">
         <button type="button" onClick={handleCopyDraft} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-[#252525]">
@@ -580,12 +585,23 @@ export default function AgentWorkspace() {
       const data = await res.json();
       const assistantReply = data.reply || "I have analyzed your request. How else can I assist your social strategy?";
 
+      let postProposals = data.postProposals || (data.postProposal ? [data.postProposal] : []);
+      let replyContent = assistantReply;
+      if (postProposals.length > 0) {
+        try {
+          postProposals = await saveAgentDrafts(postProposals);
+          replyContent = `${assistantReply}\n\n${postProposals.length} drafts saved. Review each one before scheduling.`;
+        } catch (saveError) {
+          setErrorMsg(`${saveError.message} The proposals are shown but are not saved yet.`);
+        }
+      }
+
       const assistantMsg = {
         id: `msg_${newMessages.length + 1}`,
         role: "assistant",
-        content: assistantReply,
-        postProposal: data.postProposal || null,
-        postProposals: data.postProposals || (data.postProposal ? [data.postProposal] : []),
+        content: replyContent,
+        postProposal: postProposals[0] || null,
+        postProposals,
         createdAt: new Date().toISOString(),
       };
 
@@ -600,22 +616,65 @@ export default function AgentWorkspace() {
     }
   };
 
+  const saveAgentDrafts = async (proposals) => {
+    const unsaved = proposals.filter((proposal) => !proposal.id);
+    if (unsaved.length === 0) return proposals;
+
+    const response = await fetch("/api/agent/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposals: unsaved }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(payload.drafts) || payload.drafts.length !== unsaved.length) {
+      throw new Error(payload.error || "The generated drafts could not be saved.");
+    }
+
+    let savedIndex = 0;
+    return proposals.map((proposal) => proposal.id ? proposal : {
+      ...proposal,
+      ...payload.drafts[savedIndex++],
+      platforms: proposal.platforms,
+    });
+  };
+
   // Open Proposed Post in Composer
-  const handleOpenProposalInComposer = (proposal) => {
+  const handleOpenProposalInComposer = async (proposal) => {
     const platforms = (proposal.platforms || selectedChannels).filter((platform) => platform !== "meta_ads");
     if (platforms.length === 0) {
       setErrorMsg("Meta Ads campaign publishing is not available from the post scheduler.");
       return;
     }
 
-    setComposerInitialPost({
-      platform: platforms[0] || "youtube",
-      title: proposal.title || "",
-      description: proposal.description || "",
-      tags: proposal.tags || "",
-      platforms,
-    });
-    setComposerOpen(true);
+    try {
+      const [savedProposal] = await saveAgentDrafts([proposal]);
+      setErrorMsg("");
+      setComposerInitialPost({
+        id: savedProposal.id,
+        platform: platforms[0] || "youtube",
+        title: savedProposal.title || "",
+        description: savedProposal.description || "",
+        tags: savedProposal.tags || "",
+        mediaUrl: savedProposal.mediaUrl || "",
+        scheduledAt: savedProposal.scheduledAt,
+        platforms,
+      });
+      setComposerOpen(true);
+    } catch (error) {
+      setErrorMsg(error.message || "The draft could not be saved. Please try again.");
+    }
+  };
+
+  const handleGenerateProposalMedia = async (proposal) => {
+    try {
+      const [savedProposal] = await saveAgentDrafts([proposal]);
+      setMediaProposal(savedProposal);
+      setMediaPrompt(`Create a polished social media visual for this post: ${savedProposal.title ? `${savedProposal.title}. ` : ""}${savedProposal.description}`);
+      setMediaGeneratorOpen(true);
+      setErrorMsg("");
+    } catch (error) {
+      setErrorMsg(error.message || "The draft could not be saved. Please try again.");
+    }
   };
 
   const connectedModelName = AGENT_MODELS.find((model) => model.id === providerConfig?.model)?.name || AGENT_MODELS[0].name;
@@ -863,11 +922,7 @@ export default function AgentWorkspace() {
                               index={pIdx}
                               total={proposals.length}
                               onOpenComposer={handleOpenProposalInComposer}
-                              onGenerateMedia={(proposal) => {
-                                setMediaProposal(proposal);
-                                setMediaPrompt(`Create a polished social media visual for this post: ${proposal.title ? `${proposal.title}. ` : ""}${proposal.description}`);
-                                setMediaGeneratorOpen(true);
-                              }}
+                              onGenerateMedia={handleGenerateProposalMedia}
                             />
                           ))}
                         </div>
@@ -1054,12 +1109,14 @@ export default function AgentWorkspace() {
           const proposal = mediaProposal || [...messages].reverse().find((item) => item.postProposal)?.postProposal;
           const platforms = (proposal?.platforms || selectedChannels).filter((platform) => platform !== "meta_ads");
           setComposerInitialPost({
+            id: proposal?.id,
             platform: platforms[0] || "instagram",
             title: proposal?.title || "",
             description: proposal?.description || "",
             tags: proposal?.tags || "",
             platforms: platforms.length > 0 ? platforms : ["instagram"],
             mediaUrl: url,
+            scheduledAt: proposal?.scheduledAt,
           });
           setMediaGeneratorOpen(false);
           setComposerOpen(true);
