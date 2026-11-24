@@ -29,6 +29,7 @@ import {
   FiSend, 
   FiInfo,
   FiCheckCircle,
+  FiCopy,
   FiFilm,
   FiSettings,
 } from "react-icons/fi";
@@ -186,6 +187,37 @@ function FormattedMessage({ content }) {
         {cleaned}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function MessageCopyButton({ text }) {
+  const [copyState, setCopyState] = useState("idle");
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+
+    window.setTimeout(() => setCopyState("idle"), 2000);
+  };
+
+  const label = copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy";
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      disabled={!text}
+      aria-label={copyState === "copied" ? "Message copied" : "Copy message text"}
+      aria-live="polite"
+      className="inline-flex min-h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-[#252525] dark:hover:text-zinc-100"
+    >
+      {copyState === "copied" ? <FiCheckCircle aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -829,6 +861,7 @@ export default function AgentWorkspace() {
           <div className="flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-3.5 scrollbar-subtle">
             {messages.map((msg) => {
               const isUser = msg.role === "user";
+              const copyText = sanitizeText(msg.content);
               return (
                 <div
                   key={msg.id}
@@ -861,6 +894,9 @@ export default function AgentWorkspace() {
                       ) : (
                         <FormattedMessage content={msg.content} />
                       )}
+                    </div>
+                    <div className="flex justify-end">
+                      <MessageCopyButton text={copyText} />
                     </div>
 
                     {/* Interactive Post Proposal Cards */}
