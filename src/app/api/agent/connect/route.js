@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { generateFreeAgentText, isFreeAgentModel } from "@/lib/agent-models";
+import { testAgentModel } from "@/lib/agent-models";
+import { AGENT_MODEL_ID } from "@/lib/agent-model-config";
 import { AGENT_MODEL_COOKIE, AGENT_MODEL_COOKIE_MAX_AGE, createAgentModelCookieValue } from "@/lib/agent-model-connection";
 
 export const maxDuration = 30;
@@ -14,16 +15,11 @@ export async function POST(request) {
     }
 
     const { modelId } = await request.json();
-    if (!isFreeAgentModel(modelId)) {
-      return NextResponse.json({ error: "Choose an available free model." }, { status: 400 });
+    if (modelId !== AGENT_MODEL_ID) {
+      return NextResponse.json({ error: "Choose the configured AI Gateway model." }, { status: 400 });
     }
 
-    await generateFreeAgentText({
-      modelId,
-      prompt: "Reply with the single word READY.",
-      maxOutputTokens: 8,
-      abortSignal: AbortSignal.timeout(20_000),
-    });
+    await testAgentModel({ abortSignal: AbortSignal.timeout(20_000) });
 
     const response = NextResponse.json({ success: true, modelId });
     response.cookies.set(AGENT_MODEL_COOKIE, createAgentModelCookieValue(session.user, modelId), {
@@ -42,7 +38,7 @@ export async function POST(request) {
         ? 504
         : 503;
     return NextResponse.json(
-      { error: error.message || "The free model could not be reached. Please try again." },
+      { error: error.message || "The AI model could not be reached. Please try again." },
       { status }
     );
   }

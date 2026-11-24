@@ -59,7 +59,7 @@ export async function POST(request) {
     const cookieStore = await cookies();
     const connectedModel = getConnectedAgentModel(cookieStore.get(AGENT_MODEL_COOKIE)?.value, session.user);
     if (!connectedModel) {
-      return NextResponse.json({ error: "Connect a free AI model in the Agent workspace before generating media." }, { status: 403 });
+      return NextResponse.json({ error: "Connect the AI model in the Agent workspace before generating media." }, { status: 403 });
     }
 
     const apiKey = process.env.NVIDIA_API_KEY;

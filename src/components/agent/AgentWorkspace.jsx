@@ -36,6 +36,7 @@ import {
 import PostComposerModal from "@/components/composer/PostComposerModal";
 import MediaGeneratorModal from "@/components/media/MediaGeneratorModal";
 import AgentConnectionDialog from "@/components/agent/AgentConnectionDialog";
+import { AGENT_MODEL_ID, AGENT_MODELS } from "@/lib/agent-model-config";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -53,10 +54,10 @@ const PLATFORM_ICONS = {
 };
 
 const PROMPT_SUGGESTIONS = [
-  "Draft a viral product launch announcement across YouTube and X.",
-  "Write 3 engaging tweet hooks about AI productivity tips.",
-  "Create a week-long content calendar theme for our social channels.",
-  "Write an insightful LinkedIn post discussing remote work trends.",
+  "Write a short Instagram caption about self-care.",
+  "Create one Facebook post introducing my business.",
+  "Draft three Instagram posts about this week’s offer.",
+  "Write a concise LinkedIn post about our latest update.",
 ];
 
 // Aggressively sanitize any legacy model name mentions or unparsed raw JSON blocks from text
@@ -221,127 +222,60 @@ function MessageCopyButton({ text }) {
   );
 }
 
-function PostProposalCard({ proposal, index, total, onOpenComposer }) {
-  const [showJson, setShowJson] = useState(false);
-  const [copied, setCopied] = useState(false);
+function PostProposalCard({ proposal, index, total, onOpenComposer, onGenerateMedia }) {
+  const [copyLabel, setCopyLabel] = useState("Copy draft");
 
-  const handleCopyJson = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(JSON.stringify(proposal, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const handleCopyDraft = async () => {
+    const content = [proposal.title, proposal.description, proposal.tags].filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyLabel("Copied");
+    } catch {
+      setCopyLabel("Copy failed");
     }
+    window.setTimeout(() => setCopyLabel("Copy draft"), 2000);
   };
 
   return (
-    <div className="p-3 rounded-md bg-zinc-50 dark:bg-[#181717] border border-zinc-200 dark:border-[#262525] space-y-2 transition-colors">
-      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-[#252525] pb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-          <span className="text-[10px] font-bold text-[#612bd3] dark:text-[#8c66ff] uppercase tracking-wider">
-            {total > 1 ? `Proposal #${index + 1}` : "Proposed Post"}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
+    <div className="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 transition-colors dark:border-[#262525] dark:bg-[#181717]">
+      <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5 dark:border-[#252525]">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#612bd3] dark:text-[#8c66ff]">
+          {total > 1 ? `Draft ${index + 1}` : "Ready-to-review draft"}
+        </span>
+        <div className="flex items-center gap-1" aria-label="Draft platforms">
           {proposal.platforms?.map((pKey) => {
-            const pInfo = PLATFORM_ICONS[pKey] || { name: pKey, Icon: FaShareAlt, color: "text-zinc-400" };
+            const pInfo = PLATFORM_ICONS[pKey] || { name: pKey, Icon: FaShareAlt };
             const PIcon = pInfo.Icon;
             return (
-              <span
-                key={pKey}
-                className="p-1 rounded bg-zinc-200/70 dark:bg-[#201f1f] text-zinc-700 dark:text-zinc-300"
-                title={pInfo.name}
-              >
-                <PIcon className="text-xs" />
+              <span key={pKey} className="rounded bg-zinc-200/70 p-1 text-zinc-700 dark:bg-[#201f1f] dark:text-zinc-300" title={pInfo.name}>
+                <PIcon className="text-xs" aria-hidden="true" />
+                <span className="sr-only">{pInfo.name}</span>
               </span>
             );
           })}
         </div>
       </div>
 
-      {proposal.title && (
-        <div>
-          <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
-            Title
-          </span>
-          <p className="text-xs font-semibold text-zinc-900 dark:text-white mt-0.5">
-            {proposal.title}
-          </p>
-        </div>
-      )}
+      {proposal.title && <p className="text-xs font-semibold text-zinc-900 dark:text-white">{proposal.title}</p>}
+      {proposal.description && <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">{proposal.description}</p>}
+      {proposal.tags && <p className="text-[11px] text-sky-600 dark:text-sky-400">{proposal.tags}</p>}
 
-      {proposal.description && (
-        <div>
-          <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
-            Content
-          </span>
-          <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 line-clamp-4 whitespace-pre-wrap">
-            {proposal.description}
-          </p>
-        </div>
-      )}
-
-      {proposal.tags && (
-        <div>
-          <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
-            Tags
-          </span>
-          <p className="text-[11px] text-sky-600 dark:text-sky-400 font-mono mt-0.5">
-            {proposal.tags}
-          </p>
-        </div>
-      )}
-
-      {/* Action Row */}
-      <div className="pt-1.5 border-t border-zinc-200 dark:border-[#252525] flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setShowJson(!showJson)}
-          className="text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-2 py-0.5 rounded bg-zinc-200/70 dark:bg-[#201f1f] hover:bg-zinc-300 dark:hover:bg-[#262525] transition-colors cursor-pointer"
-        >
-          {showJson ? "Hide JSON" : "JSON"}
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-2 dark:border-[#252525]">
+        <button type="button" onClick={handleCopyDraft} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-[#252525]">
+          <FiCopy aria-hidden="true" /> {copyLabel}
         </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenComposer(proposal)}
-          className="px-3 py-1 rounded-md bg-[#612bd3] hover:bg-[#7237e8] text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <FiCalendar className="text-xs" />
-          <span>Open in Composer</span>
+        <button type="button" onClick={() => onGenerateMedia(proposal)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-[#252525]">
+          <FiFilm aria-hidden="true" /> Generate media
+        </button>
+        <button type="button" onClick={() => onOpenComposer(proposal)} className="inline-flex items-center gap-1.5 rounded-md bg-[#612bd3] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#7237e8]">
+          <FiCalendar aria-hidden="true" /> Review &amp; schedule
         </button>
       </div>
-
-      {/* Collapsible Raw JSON Display */}
-      {showJson && (
-        <div className="mt-2 rounded bg-zinc-100 dark:bg-[#101012] border border-zinc-200 dark:border-[#252525] p-2 relative">
-          <div className="flex items-center justify-between mb-1 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
-            <span>Payload:</span>
-            <button
-              type="button"
-              onClick={handleCopyJson}
-              className="text-[#612bd3] dark:text-[#8c66ff] hover:underline text-[10px] font-semibold cursor-pointer"
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 overflow-x-auto leading-normal whitespace-pre">
-            <code>{JSON.stringify(proposal, null, 2)}</code>
-          </pre>
-        </div>
-      )}
     </div>
   );
 }
 
-const DEFAULT_WELCOME = `Hello! I am your AI Social Media Marketing Agent, ready to create social content once a free model is connected.
-
-### What I can do for you:
-- ✍️ **Craft Viral Copy**: Generate high-converting hooks, descriptions, and hashtags.
-- 📅 **Multi-Channel Scheduling**: Prepare complete post proposals ready to schedule in 1 click.
-- 🧠 **Context Memory**: I remember your brand voice and instructions across our conversation.
-
-Select your target channels on the left and tell me what you'd like to plan!`;
+const DEFAULT_WELCOME = `Tell me what you want to post and I’ll create concise, platform-specific drafts. If an important detail is missing, I’ll ask one short question. You can copy a draft, generate media, or review it in the composer before scheduling.`;
 
 export default function AgentWorkspace() {
   const { data: session, status } = useSession();
@@ -362,6 +296,8 @@ export default function AgentWorkspace() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerInitialPost, setComposerInitialPost] = useState(null);
   const [mediaGeneratorOpen, setMediaGeneratorOpen] = useState(false);
+  const [mediaPrompt, setMediaPrompt] = useState("");
+  const [mediaProposal, setMediaProposal] = useState(null);
   const [agentConnectionOpen, setAgentConnectionOpen] = useState(false);
   const [providerConfig, setProviderConfig] = useState(null);
 
@@ -484,7 +420,7 @@ export default function AgentWorkspace() {
     queueMicrotask(() => {
       try {
         const savedModel = sessionStorage.getItem("social_agent_model");
-        if (savedModel) setProviderConfig({ model: savedModel });
+        if (savedModel) setProviderConfig({ model: AGENT_MODEL_ID });
       } catch {
         setProviderConfig(null);
       }
@@ -543,7 +479,7 @@ export default function AgentWorkspace() {
         {
           id: "welcome_" + Date.now(),
           role: "assistant",
-          content: `New conversation started! Target channels: **${targetNames}**.\n\nWhat social campaign or post would you like to create?`,
+          content: `New chat · ${targetNames}.\n\nTell me what you want to post. I’ll create concise, channel-specific drafts you can copy, add media to, or review before scheduling.`,
         },
       ],
     };
@@ -681,6 +617,8 @@ export default function AgentWorkspace() {
     setComposerOpen(true);
   };
 
+  const connectedModelName = AGENT_MODELS.find((model) => model.id === providerConfig?.model)?.name || AGENT_MODELS[0].name;
+
   if (status === "unauthenticated") {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-white transition-colors">
@@ -804,7 +742,7 @@ export default function AgentWorkspace() {
                   </h1>
                   <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                    {providerConfig ? "Free model connected" : "Model not connected"}
+                    {providerConfig ? "AI model connected" : "Model not connected"}
                   </span>
                 </div>
                 {/* Active Channel Pills */}
@@ -832,15 +770,23 @@ export default function AgentWorkspace() {
               <button
                 type="button"
                 onClick={() => setAgentConnectionOpen(true)}
-                aria-label={providerConfig ? `Connected model: ${providerConfig.model}` : "Connect a free AI model"}
+                aria-label={providerConfig ? `Connected model: ${connectedModelName}` : "Connect the AI model"}
                 className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-[#201f1f] hover:bg-zinc-200 dark:hover:bg-[#262525] border border-zinc-200 dark:border-[#2e2d2d] text-xs font-medium text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <FiSettings className="text-xs" />
-                <span>{providerConfig ? providerConfig.model : "Connect free model"}</span>
+                <span>{providerConfig ? connectedModelName : "Connect AI model"}</span>
               </button>
               <button
                 type="button"
-                onClick={() => providerConfig ? setMediaGeneratorOpen(true) : setAgentConnectionOpen(true)}
+                onClick={() => {
+                  if (!providerConfig) {
+                    setAgentConnectionOpen(true);
+                    return;
+                  }
+                  setMediaPrompt("");
+                  setMediaProposal(null);
+                  setMediaGeneratorOpen(true);
+                }}
                 className="px-2.5 py-1 rounded-md bg-[#612bd3]/10 hover:bg-[#612bd3]/15 border border-[#612bd3]/20 text-xs font-medium text-[#612bd3] dark:text-[#a88aff] flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <FiFilm className="text-xs" />
@@ -916,6 +862,11 @@ export default function AgentWorkspace() {
                               index={pIdx}
                               total={proposals.length}
                               onOpenComposer={handleOpenProposalInComposer}
+                              onGenerateMedia={(proposal) => {
+                                setMediaProposal(proposal);
+                                setMediaPrompt(`Create a polished social media visual for this post: ${proposal.title ? `${proposal.title}. ` : ""}${proposal.description}`);
+                                setMediaGeneratorOpen(true);
+                              }}
                             />
                           ))}
                         </div>
@@ -989,7 +940,7 @@ export default function AgentWorkspace() {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Ask agent to write, strategize, or schedule posts (Enter to send)..."
+                placeholder="What would you like to post? (Enter to send)"
                 rows={1}
                 className="w-full bg-transparent px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none max-h-24 leading-normal"
               />
@@ -1098,9 +1049,13 @@ export default function AgentWorkspace() {
       <MediaGeneratorModal
         isOpen={mediaGeneratorOpen}
         agentModel={providerConfig?.model || ""}
-        onClose={() => setMediaGeneratorOpen(false)}
+        initialPrompt={mediaPrompt}
+        onClose={() => {
+          setMediaGeneratorOpen(false);
+          setMediaProposal(null);
+        }}
         onSaved={({ url }) => {
-          const proposal = [...messages].reverse().find((item) => item.postProposal)?.postProposal;
+          const proposal = mediaProposal || [...messages].reverse().find((item) => item.postProposal)?.postProposal;
           const platforms = (proposal?.platforms || selectedChannels).filter((platform) => platform !== "meta_ads");
           setComposerInitialPost({
             platform: platforms[0] || "instagram",

@@ -81,7 +81,7 @@ function addBrandText(dataUrl, text) {
   });
 }
 
-export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentModel = "" }) {
+export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentModel = "", initialPrompt = "" }) {
   const [mode, setMode] = useState("image");
   const [connectedModel, setConnectedModel] = useState(agentModel);
   const [prompt, setPrompt] = useState("");
@@ -97,17 +97,16 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentMod
     queueMicrotask(() => {
       if (agentModel) {
         setConnectedModel(agentModel);
-        return;
-      }
-      if (isOpen) {
+      } else if (isOpen) {
         try {
           setConnectedModel(sessionStorage.getItem("social_agent_model") || "");
         } catch {
           setConnectedModel("");
         }
       }
+      if (isOpen && initialPrompt) setPrompt(initialPrompt);
     });
-  }, [agentModel, isOpen]);
+  }, [agentModel, initialPrompt, isOpen]);
 
   if (!isOpen) return null;
 
@@ -120,7 +119,7 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentMod
   const handleGenerate = async (event) => {
     event.preventDefault();
     if (!connectedModel) {
-      toast.error("Connect a free model in the Agent workspace first.");
+      toast.error("Connect the AI model in the Agent workspace first.");
       return;
     }
     if (!prompt.trim()) {
@@ -295,7 +294,7 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentMod
 
             {!connectedModel && (
               <div role="status" className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
-                <span>Connect the free AI model before generating media for your agent.</span>
+                <span>Connect the AI model before generating media.</span>
                 <Link href="/agents" onClick={handleClose} className="font-semibold underline underline-offset-2">Open Agent workspace</Link>
               </div>
             )}

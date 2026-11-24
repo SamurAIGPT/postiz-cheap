@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
 import { AGENT_MODEL_COOKIE, getConnectedAgentModel } from "@/lib/agent-model-connection";
-import { generateFreeAgentText } from "@/lib/agent-models";
+import { generateAgentResponse } from "@/lib/agent-models";
 
 export const maxDuration = 60;
 
@@ -11,13 +11,27 @@ const PLATFORM_NAMES = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
-  x_twitter: "X (Twitter)",
+  x_twitter: "X",
   facebook: "Facebook",
   meta_ads: "Meta Ads",
   linkedin: "LinkedIn",
   threads: "Threads",
   pinterest: "Pinterest",
 };
+
+const PLATFORM_KEYS = new Set(Object.keys(PLATFORM_NAMES));
+
+function formatHistory(history) {
+  if (!Array.isArray(history)) return "No earlier messages.";
+
+  const entries = history.slice(-8).map((item) => {
+    const role = item?.role === "user" ? "User" : "Agent";
+    const content = typeof item?.content === "string" ? item.content.trim().slice(0, 500) : "";
+    return content ? `${role}: ${content}` : "";
+  }).filter(Boolean);
+
+  return entries.length > 0 ? entries.join("\n") : "No earlier messages.";
+}
 
 export async function POST(req) {
   try {
@@ -29,152 +43,91 @@ export async function POST(req) {
     const body = await req.json();
     const cookieStore = await cookies();
     const modelId = getConnectedAgentModel(cookieStore.get(AGENT_MODEL_COOKIE)?.value, session.user);
-    let { 
-      message, 
-      messages = [], 
-      history = [], 
-      selectedChannels = [], 
-      targetChannels = [], 
-      threadId 
-    } = body;
+    const messageList = Array.isArray(body.messages) ? body.messages : [];
+    let message = body.message;
+    let history = Array.isArray(body.history) ? body.history : [];
 
-    // Support targetChannels alias
-    const activeChannels = Array.isArray(selectedChannels) && selectedChannels.length > 0 
-      ? selectedChannels 
-      : (Array.isArray(targetChannels) ? targetChannels : []);
-
-    // If messages array was passed, extract current message and prior history
-    if (!message && Array.isArray(messages) && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      message = lastMsg?.content || "";
-      if (!history || history.length === 0) {
-        history = messages.slice(0, -1);
-      }
+    if (!message && messageList.length > 0) {
+      message = messageList.at(-1)?.content || "";
+      if (history.length === 0) history = messageList.slice(0, -1);
     }
 
-    if (!message || typeof message !== "string" || !message.trim()) {
+    if (typeof message !== "string" || !message.trim()) {
       return NextResponse.json({ error: "Message content cannot be empty." }, { status: 400 });
     }
-
+    if (message.length > 2000) {
+      return NextResponse.json({ error: "Keep each request under 2,000 characters." }, { status: 400 });
+    }
     if (!modelId) {
-      return NextResponse.json({ error: "Connect the free AI model in the Agent workspace before starting the agent." }, { status: 403 });
+      return NextResponse.json({ error: "Connect the AI model in the Agent workspace before starting the agent." }, { status: 403 });
     }
 
-    // 1. Format the target channel context
-    const channelNames = activeChannels.map((k) => PLATFORM_NAMES[k] || k).join(", ");
-    const channelContext = channelNames ? `Active Target Channels: ${channelNames}` : "Target Channels: All connected social channels";
-    const hasMetaAds = activeChannels.includes("meta_ads");
+    const channelInput = Array.isArray(body.selectedChannels) && body.selectedChannels.length > 0
+      ? body.selectedChannels
+      : Array.isArray(body.targetChannels) ? body.targetChannels : [];
+    const activeChannels = [...new Set(channelInput.filter((channel) => typeof channel === "string" && PLATFORM_KEYS.has(channel)))];
+
+    if (activeChannels.length === 0) {
+      return NextResponse.json({
+        success: true,
+        reply: "Which channel should I prepare this for? Select one or more channels on the left, then send your request again.",
+        postProposal: null,
+        postProposals: [],
+        needsClarification: true,
+        threadId: body.threadId,
+      });
+    }
+
     const scheduleableChannels = activeChannels.filter((channel) => channel !== "meta_ads");
-    const metaOnlySelected = hasMetaAds && scheduleableChannels.length === 0;
-    const proposalChannels = scheduleableChannels.length > 0
-      ? scheduleableChannels
-      : (hasMetaAds ? [] : ["youtube"]);
-    const jsonFence = String.fromCharCode(96).repeat(3);
-    const outputInstructions = metaOnlySelected
-      ? "3. For Meta Ads, draft a campaign concept in prose with objective, primary text, headline, CTA, and an audience hypothesis. Do not return scheduler JSON or claim a campaign was created, launched, or spent budget."
-      : `3. When the user asks for social posts, include the explanation and a fenced JSON block for the scheduler. Keep its platform list limited to ${JSON.stringify(proposalChannels)}. If Meta Ads is also selected, describe any ad concept in prose only; do not claim it was launched.`;
-    const structuredPostInstructions = metaOnlySelected
-      ? ""
-      : `STRUCTURED POST FORMAT:\nWhen suggesting a post ready for scheduling, include:\n${jsonFence}json\n${JSON.stringify({
-          action: "schedule_post",
-          platforms: proposalChannels,
-          title: "A captivating, clickable title or headline",
-          description: "The complete post text, formatted with clean line breaks and emojis",
-          tags: "relevant, comma, separated, hashtags",
-        }, null, 2)}\n${jsonFence}`;
+    const metaOnlySelected = activeChannels.includes("meta_ads") && scheduleableChannels.length === 0;
+    const channelNames = activeChannels.map((channel) => PLATFORM_NAMES[channel]).join(", ");
+    const conversationHistory = formatHistory(history);
 
-    // Keep only recent conversation context to limit prompt size.
-    const formattedHistory = (history || [])
-      .slice(-10)
-      .map((item) => {
-        const roleName = item.role === "user" ? "User" : "Agent";
-        // Trim each message to keep the request concise.
-        const content = typeof item.content === "string" 
-          ? (item.content.length > 800 ? item.content.slice(0, 800) + "..." : item.content)
-          : "";
-        return `${roleName}: ${content}`;
-      })
-      .join("\n\n");
+    const instructions = `You are a practical social media writing assistant. Help the user finish the task they asked for, without turning it into a marketing lesson.
 
-    const systemPrompt = `You are an elite, highly creative AI Social Media Manager & Marketing Agent for this workspace.
-You help creators, founders, and businesses craft viral, high-converting social media content, build multi-channel campaigns, and schedule posts.
+Selected channels: ${channelNames}.
+Conversation context (use it for brand, audience, offer, and tone; do not repeat it back):
+${conversationHistory}
 
-${channelContext}
+Behavior:
+- Keep the visible reply to one short sentence. Do not include a long introduction, strategy essay, unsolicited list of hooks, monthly framework, markdown table, or raw JSON.
+- For a post request, return ready-to-use drafts in postProposals. Create one platform-specific draft for each selected non-ad channel unless the user asks for a different count. Never assign a draft to a channel the user did not select.
+- Tailor each draft to its platform. Use a clear hook, natural concise copy, a relevant call to action only when appropriate, and up to 4 relevant hashtags. Do not invent offers, testimonials, scarcity, facts, or guaranteed results.
+- Create calendars, multiple variations, video scripts, or a content strategy only when the user explicitly requests them. Return no more than 9 post proposals per response.
+- Ask one concise clarifying question only if a useful, accurate draft cannot be made from the request and conversation history. Set needsClarification to true and return no proposals when asking.
+- For ordinary questions, answer directly in reply and return no proposals.
+- Never claim anything was scheduled, published, or launched. Scheduling always requires the user's review in the composer.
+${metaOnlySelected
+    ? "Meta Ads is the only selected channel. Provide a concise campaign draft in reply if requested, but no scheduler post proposals and never claim the campaign was launched."
+    : activeChannels.includes("meta_ads")
+      ? "Meta Ads is also selected, but social post proposals must target only the selected non-ad channels. Do not claim an ad campaign was launched."
+      : ""}`;
 
-CAPABILITIES & RESPONSIBILITIES:
-1. Brainstorm and write platform-tailored social copy (hooks, captions, descriptions, hashtags) respecting each platform's character limits and style (e.g. 280 chars for X, descriptions and tags for YouTube, punchy text for TikTok/Instagram).
-2. Remember all context, tone, previous discussion, and brand guidelines shared during this conversation.
-3. Treat Meta Ads as a campaign-drafting channel only. Never say that a campaign was created, launched, or spent budget; no campaign publishing flow is connected.
-${outputInstructions}
-
-${structuredPostInstructions}
-
-PREVIOUS CONVERSATION HISTORY (Remember these past messages):
-${formattedHistory ? formattedHistory : "None (this is the start of the conversation)"}
-`;
-
-    const rawOutput = await generateFreeAgentText({
-      modelId,
-      system: systemPrompt,
+    const response = await generateAgentResponse({
+      instructions,
       prompt: message.trim(),
-      maxOutputTokens: 1200,
+      maxOutputTokens: 900,
       abortSignal: AbortSignal.timeout(45_000),
     });
 
-    if (!rawOutput) {
-      return NextResponse.json({ error: "AI agent returned an empty response or timed out. Please check its compatibility and try again." }, { status: 504 });
-    }
-
-    // 5. Extract structured post proposal(s) if present in the output
-    let postProposal = null;
-    let postProposals = [];
-    let cleanedReply = rawOutput;
-
-    const jsonMatch = rawOutput.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        const parsedJson = JSON.parse(jsonMatch[1]);
-        
-        const normalizeProposal = (item) => {
-          const platforms = Array.isArray(item.platforms)
-            ? item.platforms.filter((platform) => platform !== "meta_ads")
-            : [];
-          return {
-            platforms: platforms.length > 0
-              ? platforms
-              : (scheduleableChannels.length > 0 ? scheduleableChannels : ["youtube"]),
-            title: item.title || "",
-            description: item.description || "",
-            tags: item.tags || "",
-          };
-        };
-
-        if (metaOnlySelected) {
-          cleanedReply = rawOutput.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
-        } else if (Array.isArray(parsedJson) && parsedJson.length > 0) {
-          postProposals = parsedJson.map(normalizeProposal);
-          postProposal = postProposals[0];
-          // Remove the raw JSON block from the conversational reply
-          cleanedReply = rawOutput.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
-        } else if (parsedJson && (parsedJson.action === "schedule_post" || parsedJson.title || parsedJson.description)) {
-          postProposal = normalizeProposal(parsedJson);
-          postProposals = [postProposal];
-          // Remove the raw JSON block from the conversational reply
-          cleanedReply = rawOutput.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
-        }
-      } catch (err) {
-        console.warn("[Agent JSON parse warning]:", err.message);
-      }
-    }
+    const allowedChannels = new Set(scheduleableChannels);
+    const postProposals = metaOnlySelected || response.needsClarification
+      ? []
+      : response.postProposals.map((proposal) => ({
+          ...proposal,
+          platforms: proposal.platforms.filter((platform) => allowedChannels.has(platform)).slice(0, 1),
+        })).filter((proposal) => proposal.platforms.length > 0);
+    const reply = response.needsClarification
+      ? response.reply
+      : response.reply || (postProposals.length > 0 ? "Your drafts are ready to review below." : "How else can I help with your social content?");
 
     return NextResponse.json({
       success: true,
-      reply: cleanedReply || (metaOnlySelected
-        ? "Meta Ads campaign drafts are available, but campaign creation and launch are not connected."
-        : rawOutput),
-      postProposal,
+      reply,
+      postProposal: postProposals[0] || null,
       postProposals,
-      threadId,
+      needsClarification: response.needsClarification,
+      threadId: body.threadId,
     });
   } catch (error) {
     console.error("[AGENT_CHAT_ERROR]", error);

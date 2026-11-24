@@ -1,64 +1,76 @@
-export const FREE_AGENT_MODELS = [
-  {
-    id: "nvidia/nemotron-3.5-lightning-30b-a3b",
-    name: "NVIDIA Nemotron 3.5 Lightning",
-    provider: "NVIDIA NIM",
-    costLabel: "Free",
-  },
+import { generateText, Output } from "ai";
+import { z } from "zod";
+import { AGENT_MODEL_ID } from "@/lib/agent-model-config";
+
+const PLATFORM_KEYS = [
+  "youtube",
+  "tiktok",
+  "instagram",
+  "x_twitter",
+  "facebook",
+  "linkedin",
+  "threads",
+  "pinterest",
 ];
 
-const FREE_AGENT_MODEL_IDS = new Set(FREE_AGENT_MODELS.map((model) => model.id));
-const NVIDIA_CHAT_COMPLETIONS_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const AgentResponseSchema = z.object({
+  reply: z.string().max(500),
+  needsClarification: z.boolean(),
+  postProposals: z.array(z.object({
+    platforms: z.array(z.enum(PLATFORM_KEYS)).min(1).max(1),
+    title: z.string().max(120),
+    description: z.string().max(2400),
+    tags: z.string().max(300),
+  })).max(9),
+});
 
-export function isFreeAgentModel(modelId) {
-  return typeof modelId === "string" && FREE_AGENT_MODEL_IDS.has(modelId);
+function toGatewayError(error) {
+  if (error.name === "AbortError" || error.name === "TimeoutError") return error;
+
+  const providerStatus = Number(error.statusCode || error.status);
+  const status = providerStatus === 401 || providerStatus === 403
+    ? 503
+    : Number.isInteger(providerStatus) ? providerStatus : 502;
+  const message = status === 429
+    ? "The AI model is busy right now. Please try again shortly."
+    : providerStatus === 401 || providerStatus === 403
+      ? "AI Gateway could not authenticate the request. Check the Vercel AI Gateway integration."
+      : "The AI model could not complete the request. Please try again.";
+
+  return Object.assign(new Error(message), { status, cause: error });
 }
 
-export async function generateFreeAgentText({ modelId, system, prompt, maxOutputTokens, abortSignal }) {
-  if (!isFreeAgentModel(modelId)) {
-    throw new Error("Choose an available free model.");
+export async function generateAgentResponse({ instructions, prompt, maxOutputTokens = 900, abortSignal }) {
+  try {
+    const { output } = await generateText({
+      model: AGENT_MODEL_ID,
+      instructions,
+      prompt,
+      output: Output.object({
+        name: "social_agent_response",
+        description: "A concise answer, a single clarifying question, or ready-to-review social post drafts.",
+        schema: AgentResponseSchema,
+      }),
+      maxOutputTokens,
+      abortSignal,
+    });
+
+    return output;
+  } catch (error) {
+    throw toGatewayError(error);
   }
+}
 
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) {
-    throw Object.assign(new Error("NVIDIA NIM is not configured. Add NVIDIA_API_KEY to the Vercel project environment."), { status: 503 });
+export async function testAgentModel({ abortSignal }) {
+  try {
+    const { text } = await generateText({
+      model: AGENT_MODEL_ID,
+      prompt: "Reply with the single word READY.",
+      maxOutputTokens: 8,
+      abortSignal,
+    });
+    return text;
+  } catch (error) {
+    throw toGatewayError(error);
   }
-
-  const response = await fetch(NVIDIA_CHAT_COMPLETIONS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: [
-        ...(system ? [{ role: "system", content: system }] : []),
-        { role: "user", content: prompt },
-      ],
-      max_tokens: maxOutputTokens,
-      stream: false,
-      chat_template_kwargs: { enable_thinking: false },
-    }),
-    signal: abortSignal,
-  });
-
-  const result = await response.json().catch(() => null);
-  if (!response.ok) {
-    const status = response.status === 401 || response.status === 403 ? 503 : response.status;
-    const message = response.status === 401 || response.status === 403
-      ? "NVIDIA NIM rejected the configured API key. Check NVIDIA_API_KEY in the Vercel project environment."
-      : response.status === 429
-        ? "NVIDIA NIM is rate-limiting requests. Please try again shortly."
-        : "NVIDIA NIM could not complete the request. Please try again.";
-    throw Object.assign(new Error(message), { status });
-  }
-
-  const text = result?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) {
-    throw Object.assign(new Error("NVIDIA NIM returned an empty response. Please try again."), { status: 502 });
-  }
-
-  return text;
 }
