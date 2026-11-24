@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { FaYoutube, FaInstagram, FaFacebook, FaLinkedin, FaPinterest, FaBullhorn } from "react-icons/fa";
 import { FaXTwitter, FaThreads } from "react-icons/fa6";
 import { SiTiktok } from "react-icons/si";
-import { FiEdit2, FiTrash2, FiCheck, FiPlus, FiX, FiRefreshCw } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiCheck, FiPlus, FiX, FiRefreshCw, FiAlertTriangle } from "react-icons/fi";
 
 const PLATFORMS = [
   {
@@ -248,6 +248,10 @@ export default function IntegrationsPage() {
   };
 
   const handleConnect = (platform) => {
+    if (!session) {
+      signIn("google");
+      return;
+    }
     if (platform.key === "meta_ads") {
       startMetaAuthorization();
       return;
@@ -450,6 +454,25 @@ export default function IntegrationsPage() {
             Connect social accounts to publish content, or link Meta ad accounts for campaign drafts.
           </p>
         </div>
+
+        {/* Guest Warning alert */}
+        {!session?.user && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <FiAlertTriangle className="text-amber-500 text-lg shrink-0" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Sign in required</span>
+                <span className="text-[11px] text-zinc-600 dark:text-zinc-400">Connect your channels to schedule posts by logging in.</span>
+              </div>
+            </div>
+            <button
+              onClick={() => signIn("google")}
+              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
 
         {/* Platforms list */}
         <div className="flex flex-col gap-4">

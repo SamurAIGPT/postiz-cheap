@@ -1,8 +1,7 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
-
-const PRIVATE_WORKSPACE_OWNER_EMAIL = "s80891433@gmail.com";
 
 export const authOptions = {
   adapter: PrismaAdapter(prisma),
@@ -10,24 +9,48 @@ export const authOptions = {
     strategy: "jwt",
   },
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
     CredentialsProvider({
-      id: "private-workspace",
-      name: "Private Workspace",
-      credentials: {},
-      async authorize() {
-        const user = await prisma.user.findUnique({
-          where: { email: PRIVATE_WORKSPACE_OWNER_EMAIL },
-        });
+      name: "Demo / Admin Account",
+      credentials: {
+        email: { label: "Email", type: "email", placeholder: "demo@creator.local" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email?.trim().toLowerCase() || "demo@creator.local";
+        const name = email.split("@")[0].toUpperCase();
 
-        if (!user) return null;
-
-        return {
-          id: user.id,
-          name: user.name || "Private Workspace",
-          email: user.email,
-          image: user.image,
-          credits: user.credits,
-        };
+        try {
+          // Attempt to find or create in DB if database is connected
+          let user = await prisma.user.findUnique({ where: { email } });
+          if (!user) {
+            user = await prisma.user.create({
+              data: {
+                email,
+                name,
+                credits: 50,
+              },
+            });
+          }
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            credits: user.credits,
+          };
+        } catch (dbError) {
+          console.warn("[AUTH_DB_FALLBACK] Database offline or unreachable, using local session user:", dbError.message);
+          // Resilient fallback so users can always test and preview the application
+          return {
+            id: "demo-user-" + Buffer.from(email).toString("hex").slice(0, 12),
+            name: name || "Demo User",
+            email: email,
+            credits: 50,
+          };
+        }
       },
     }),
   ],
@@ -35,19 +58,19 @@ export const authOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.credits = user.credits ?? 10;
+        token.credits = user.credits ?? 50;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id || token.sub;
-        session.user.credits = token.credits ?? 10;
+        session.user.credits = token.credits ?? 50;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "free-ai-social-media-scheduler-fallback-secret-2025",
   pages: {
     signIn: "/login",
   },

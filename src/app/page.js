@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
 import { 
   FaYoutube, 
@@ -12,6 +12,7 @@ import {
   FaCalendarAlt,
   FaShareAlt,
   FaRocket,
+  FaGoogle,
   FaBolt
 } from "react-icons/fa";
 import { FaXTwitter, FaThreads } from "react-icons/fa6";
@@ -222,6 +223,77 @@ export default function WorkspaceDashboard() {
   const publishedCount = posts.filter((p) => p.status === "completed").length;
   const uniqueChannels = new Set(posts.map((p) => p.platform)).size;
   const userCredits = session?.user?.credits ?? 0;
+
+  // Unauthenticated Welcome View
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-[85vh] flex flex-col items-center justify-center px-4 py-16 bg-[#f8f9fa] dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-200">
+        <div className="max-w-2xl text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-medium shadow-xs">
+            <FaRocket className="text-[11px] text-[#612bd3] dark:text-zinc-300" />
+            <span>Social Media Scheduling Studio</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 leading-tight">
+            Schedule, preview & publish across all your channels
+          </h1>
+
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">
+            Manage YouTube, TikTok, Instagram, X (Twitter), and LinkedIn from a clean interactive content calendar with real-time feed previews.
+          </p>
+
+          <div className="flex items-center justify-center pt-2">
+            <button
+              onClick={() => signIn("google")}
+              className="px-5 py-2.5 rounded-lg bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-slate-900 dark:text-white border border-zinc-300 dark:border-zinc-700 text-xs font-semibold transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm hover:shadow active:scale-98"
+            >
+              <FaGoogle className="text-xs text-red-500" />
+              <span>Continue with Google</span>
+            </button>
+          </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-10 text-left">
+            <div className="p-4 rounded-lg bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 space-y-1.5 shadow-xs dark:shadow-none transition-colors">
+              <div className="w-8 h-8 rounded-md bg-[#612bd3]/10 dark:bg-zinc-800/60 text-[#612bd3] dark:text-zinc-300 flex items-center justify-center text-xs">
+                <FaCalendarAlt />
+              </div>
+              <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-200">
+                Content Calendar
+              </h4>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Month & week views with slot clicking and multi-channel post tracking.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 space-y-1.5 shadow-xs dark:shadow-none transition-colors">
+              <div className="w-8 h-8 rounded-md bg-purple-500/10 dark:bg-zinc-800/60 text-purple-600 dark:text-zinc-300 flex items-center justify-center text-xs">
+                <FaShareAlt />
+              </div>
+              <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-200">
+                Live Feed Mockups
+              </h4>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Real-time previews for YouTube, TikTok, Instagram, X, and LinkedIn.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 space-y-1.5 shadow-xs dark:shadow-none transition-colors">
+              <div className="w-8 h-8 rounded-md bg-pink-500/10 dark:bg-zinc-800/60 text-pink-600 dark:text-zinc-300 flex items-center justify-center text-xs">
+                <FaRocket />
+              </div>
+              <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-200">
+                Automated Publishing
+              </h4>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Scheduled background queues publish automatically to connected accounts.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
