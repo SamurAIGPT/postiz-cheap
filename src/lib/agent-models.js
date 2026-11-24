@@ -20,7 +20,7 @@ const AgentResponseSchema = z.object({
     title: z.string().max(120),
     description: z.string().max(2400),
     tags: z.string().max(300),
-  })).max(9),
+  })).max(30),
 });
 
 const NVIDIA_CHAT_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -83,7 +83,7 @@ async function requestNvidiaModel({ modelId, messages, maxTokens, abortSignal, j
   return content;
 }
 
-export async function generateAgentResponse({ modelId = AGENT_MODEL_ID, instructions, prompt, maxOutputTokens = 900, abortSignal }) {
+export async function generateAgentResponse({ modelId = AGENT_MODEL_ID, instructions, prompt, maxOutputTokens = 8000, abortSignal }) {
   try {
     const content = await requestNvidiaModel({
       modelId,
