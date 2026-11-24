@@ -44,7 +44,7 @@ export default function AgentConnectionDialog({ isOpen, onClose, onSave, initial
               <FiZap aria-hidden="true" /> Free model
             </p>
             <h2 id="agent-connection-title" className="text-base font-semibold text-zinc-900 dark:text-white">Connect your marketing agent</h2>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Use Vercel AI Gateway to power campaign writing. No separate model API key is needed.</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Use NVIDIA NIM to power campaign writing with the NVIDIA connection already configured for this app.</p>
           </div>
           <button type="button" onClick={onClose} disabled={connecting} aria-label="Close model settings" className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"><FiX aria-hidden="true" /></button>
         </header>

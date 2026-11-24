@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { generateText } from "ai";
 import { getServerSession } from "next-auth/next";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
 import { AGENT_MODEL_COOKIE, getConnectedAgentModel } from "@/lib/agent-model-connection";
-import { getFreeAgentModel } from "@/lib/agent-models";
+import { generateFreeAgentText } from "@/lib/agent-models";
 
 export const maxDuration = 60;
 
@@ -114,8 +113,8 @@ PREVIOUS CONVERSATION HISTORY (Remember these past messages):
 ${formattedHistory ? formattedHistory : "None (this is the start of the conversation)"}
 `;
 
-    const { text: rawOutput } = await generateText({
-      model: getFreeAgentModel(modelId),
+    const rawOutput = await generateFreeAgentText({
+      modelId,
       system: systemPrompt,
       prompt: message.trim(),
       maxOutputTokens: 1200,
@@ -179,9 +178,14 @@ ${formattedHistory ? formattedHistory : "None (this is the start of the conversa
     });
   } catch (error) {
     console.error("[AGENT_CHAT_ERROR]", error);
+    const status = Number.isInteger(error.status)
+      ? error.status
+      : error.name === "AbortError" || error.name === "TimeoutError"
+        ? 504
+        : 500;
     return NextResponse.json(
       { error: error.message || "An unexpected error occurred in the Agent." },
-      { status: 500 }
+      { status }
     );
   }
 }
