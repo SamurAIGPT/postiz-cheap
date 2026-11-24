@@ -5,7 +5,7 @@ import { FiCheckCircle, FiLoader, FiX, FiZap } from "react-icons/fi";
 import { AGENT_MODEL_ID, AGENT_MODELS } from "@/lib/agent-model-config";
 
 export default function AgentConnectionDialog({ isOpen, onClose, onSave, initialConfig }) {
-  const [modelId, setModelId] = useState(initialConfig?.model === AGENT_MODEL_ID ? initialConfig.model : AGENT_MODELS[0].id);
+  const [modelId, setModelId] = useState(AGENT_MODELS.some((model) => model.id === initialConfig?.model) ? initialConfig.model : AGENT_MODEL_ID);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,10 +41,10 @@ export default function AgentConnectionDialog({ isOpen, onClose, onSave, initial
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-              <FiZap aria-hidden="true" /> AI Gateway
+              <FiZap aria-hidden="true" /> NVIDIA AI
             </p>
             <h2 id="agent-connection-title" className="text-base font-semibold text-zinc-900 dark:text-white">Connect your marketing agent</h2>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Connect the configured writing model. No provider key needs to be entered here.</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Choose a writing model and test it using the NVIDIA API key already configured for this project.</p>
           </div>
           <button type="button" onClick={onClose} disabled={connecting} aria-label="Close model settings" className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"><FiX aria-hidden="true" /></button>
         </header>
@@ -69,7 +69,7 @@ export default function AgentConnectionDialog({ isOpen, onClose, onSave, initial
           {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-            <p className="max-w-[260px] text-[11px] leading-relaxed text-zinc-500">AI Gateway model usage may be billed according to the model&apos;s current rates.</p>
+            <p className="max-w-[260px] text-[11px] leading-relaxed text-zinc-500">Model usage is subject to the NVIDIA API account&apos;s limits and pricing.</p>
             <div className="flex gap-2">
               <button type="button" onClick={onClose} disabled={connecting} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">Cancel</button>
               <button type="submit" disabled={connecting || !modelId} className="inline-flex items-center gap-2 rounded-lg bg-[#612bd3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#7237e8] disabled:cursor-not-allowed disabled:opacity-60">

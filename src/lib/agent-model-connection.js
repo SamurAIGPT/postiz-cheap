@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { AGENT_MODEL_ID, isSupportedAgentModel } from "@/lib/agent-model-config";
+import { isSupportedAgentModel } from "@/lib/agent-model-config";
 
 export const AGENT_MODEL_COOKIE = "v0-agent-model";
 export const AGENT_MODEL_COOKIE_MAX_AGE = 60 * 60 * 12;
@@ -17,8 +17,8 @@ function signPayload(payload) {
 
 export function createAgentModelCookieValue(user, modelId) {
   const subject = getUserIdentity(user);
-  if (!subject || modelId !== AGENT_MODEL_ID) {
-    throw new Error("The signed-in user or AI Gateway model is invalid.");
+  if (!subject || !isSupportedAgentModel(modelId)) {
+    throw new Error("The signed-in user or AI model is invalid.");
   }
 
   const payload = Buffer.from(JSON.stringify({
