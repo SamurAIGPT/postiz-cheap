@@ -102,7 +102,7 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
       if (!mediaResponse.ok) throw new Error(mediaPayload.error || "Could not save media to your library.");
 
       toast.success("Generated media saved to your library.");
-      onSaved?.();
+      onSaved?.({ url: uploadPayload.url, mode, mimeType: result.mimeType });
     } catch (error) {
       toast.error(error.message || "Could not save generated media.");
     } finally {
