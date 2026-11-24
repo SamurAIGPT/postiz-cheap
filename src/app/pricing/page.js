@@ -21,7 +21,7 @@ export default function Pricing() {
 
   const handleCheckout = async (planId) => {
     if (status !== "authenticated") {
-      toast.error("You must sign in with Google to purchase credit packages.");
+      toast.error("The private workspace is connecting. Please try again shortly.");
       return;
     }
 

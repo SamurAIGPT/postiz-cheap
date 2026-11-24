@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { 
   FaYoutube, 
@@ -633,28 +633,6 @@ export default function AgentWorkspace() {
     });
     setComposerOpen(true);
   };
-
-  if (status === "unauthenticated") {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-6 bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-white transition-colors">
-        <div className="max-w-sm text-center space-y-3">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#1a1919] border border-zinc-200 dark:border-[#252525] text-[#612bd3] dark:text-[#8c66ff] flex items-center justify-center mx-auto shadow-xs">
-            <FaRobot className="text-lg" />
-          </div>
-          <h2 className="text-lg font-bold">Sign In to Use the Agent</h2>
-          <p className="text-xs text-zinc-500 dark:text-[#999999]">
-            Authenticate to access your connected social accounts and AI assistant.
-          </p>
-          <button
-            onClick={() => signIn("google")}
-            className="px-4 py-2 rounded-md bg-[#612bd3] hover:bg-[#7237e8] text-white text-xs font-semibold transition-colors cursor-pointer"
-          >
-            Sign In with Google
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full w-full bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors">

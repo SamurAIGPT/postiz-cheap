@@ -3,15 +3,14 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { 
   FaYoutube, 
   FaInstagram, 
   FaFacebook, 
   FaLinkedin, 
   FaPinterest,
-  FaBolt,
-  FaGoogle
+  FaBolt
 } from "react-icons/fa";
 import { FaXTwitter, FaThreads } from "react-icons/fa6";
 import { SiTiktok } from "react-icons/si";
@@ -22,7 +21,6 @@ import {
   FiImage, 
   FiCreditCard, 
   FiPlus, 
-  FiLogOut, 
   FiMenu, 
   FiDollarSign,
   FiBarChart2
@@ -202,37 +200,28 @@ export default function AppShell({ children }) {
 
           {/* Bottom Profile / Auth */}
           <div className="flex flex-col items-center gap-3 w-full px-2 pt-3 border-t border-zinc-200 dark:border-[#252525]/60 shrink-0">
-            {status === "authenticated" ? (
-              <div className="relative flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#612bd3] to-[#d82d7e] p-0.5 transition-transform hover:scale-105 cursor-pointer shadow-md shadow-[#612bd3]/30"
-                  title={session?.user?.name || session?.user?.email}
-                >
-                  {session?.user?.image ? (
-                    <img
-                      src={session.user.image}
-                      alt="User avatar"
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-zinc-100 dark:bg-[#1a1919] flex items-center justify-center text-xs font-bold text-zinc-800 dark:text-white">
-                      {session?.user?.name?.charAt(0) || "U"}
-                    </div>
-                  )}
-                </button>
-              </div>
-            ) : (
+            <div className="relative flex flex-col items-center">
               <button
                 type="button"
-                onClick={() => signIn("google")}
-                className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-[#252525] hover:bg-[#612bd3] text-zinc-700 dark:text-white hover:text-white border border-zinc-200 dark:border-transparent flex items-center justify-center transition-colors cursor-pointer"
-                title="Sign in with Google"
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#612bd3] to-[#d82d7e] p-0.5 transition-transform hover:scale-105 cursor-pointer shadow-md shadow-[#612bd3]/30"
+                title="Private workspace"
+                aria-label="Open private workspace menu"
+                aria-expanded={profileDropdownOpen}
               >
-                <FaGoogle className="text-xs" />
+                {session?.user?.image ? (
+                  <img
+                    src={session.user.image}
+                    alt="Workspace owner avatar"
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-zinc-100 dark:bg-[#1a1919] flex items-center justify-center text-xs font-bold text-zinc-800 dark:text-white">
+                    {session?.user?.name?.charAt(0) || "P"}
+                  </div>
+                )}
               </button>
-            )}
+            </div>
           </div>
         </aside>
 
@@ -433,20 +422,6 @@ export default function AppShell({ children }) {
               </Link>
             </div>
 
-            {/* Sign Out Button */}
-            <div className="pt-2 border-t border-zinc-200 dark:border-[#282727]">
-              <button
-                type="button"
-                onClick={() => {
-                  setProfileDropdownOpen(false);
-                  signOut({ callbackUrl: "/login" });
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer text-left"
-              >
-                <FiLogOut className="text-sm" />
-                <span>Sign Out</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
