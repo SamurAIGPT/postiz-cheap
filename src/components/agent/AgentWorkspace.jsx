@@ -702,7 +702,7 @@ export default function AgentWorkspace() {
   }
 
   return (
-    <div className="h-full min-h-0 w-full bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors">
+    <div className="flex-1 min-h-0 w-full bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors">
       {/* 3-Panel Main Layout */}
       <div className="flex-1 min-h-0 flex overflow-hidden divide-x divide-zinc-200 dark:divide-[#252525]">
         

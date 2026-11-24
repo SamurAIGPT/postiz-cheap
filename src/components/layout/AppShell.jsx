@@ -363,7 +363,11 @@ export default function AppShell({ children }) {
           </header>
 
           {/* Main Workspace Body */}
-          <main className="flex-1 min-h-0 bg-[#f8f9fa] dark:bg-[#141414] overflow-y-auto overflow-x-hidden scrollbar-subtle transition-colors duration-200">
+          <main className={`flex-1 min-h-0 bg-[#f8f9fa] dark:bg-[#141414] transition-colors duration-200 ${
+            pathname.startsWith("/agents")
+              ? "flex flex-col overflow-hidden"
+              : "overflow-y-auto overflow-x-hidden scrollbar-subtle"
+          }`}>
             {children}
           </main>
         </div>
