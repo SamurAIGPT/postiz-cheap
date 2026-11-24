@@ -9,6 +9,7 @@ const PLATFORM_NAMES = {
   instagram: "Instagram",
   x_twitter: "X (Twitter)",
   facebook: "Facebook",
+  meta_ads: "Meta Ads",
   linkedin: "LinkedIn",
   threads: "Threads",
   pinterest: "Pinterest",
@@ -60,6 +61,25 @@ export async function POST(req) {
     // 1. Format the target channel context
     const channelNames = activeChannels.map((k) => PLATFORM_NAMES[k] || k).join(", ");
     const channelContext = channelNames ? `Active Target Channels: ${channelNames}` : "Target Channels: All connected social channels";
+    const hasMetaAds = activeChannels.includes("meta_ads");
+    const scheduleableChannels = activeChannels.filter((channel) => channel !== "meta_ads");
+    const metaOnlySelected = hasMetaAds && scheduleableChannels.length === 0;
+    const proposalChannels = scheduleableChannels.length > 0
+      ? scheduleableChannels
+      : (hasMetaAds ? [] : ["youtube"]);
+    const jsonFence = String.fromCharCode(96).repeat(3);
+    const outputInstructions = metaOnlySelected
+      ? "3. For Meta Ads, draft a campaign concept in prose with objective, primary text, headline, CTA, and an audience hypothesis. Do not return scheduler JSON or claim a campaign was created, launched, or spent budget."
+      : `3. When the user asks for social posts, include the explanation and a fenced JSON block for the scheduler. Keep its platform list limited to ${JSON.stringify(proposalChannels)}. If Meta Ads is also selected, describe any ad concept in prose only; do not claim it was launched.`;
+    const structuredPostInstructions = metaOnlySelected
+      ? ""
+      : `STRUCTURED POST FORMAT:\nWhen suggesting a post ready for scheduling, include:\n${jsonFence}json\n${JSON.stringify({
+          action: "schedule_post",
+          platforms: proposalChannels,
+          title: "A captivating, clickable title or headline",
+          description: "The complete post text, formatted with clean line breaks and emojis",
+          tags: "relevant, comma, separated, hashtags",
+        }, null, 2)}\n${jsonFence}`;
 
     // 2. Format conversation history into system_prompt so gpt-5-mini remembers previous messages
     // Strictly limited to last 10 messages to minimize credit consumption
@@ -83,19 +103,10 @@ ${channelContext}
 CAPABILITIES & RESPONSIBILITIES:
 1. Brainstorm and write platform-tailored social copy (hooks, captions, descriptions, hashtags) respecting each platform's character limits and style (e.g. 280 chars for X, descriptions and tags for YouTube, punchy text for TikTok/Instagram).
 2. Remember all context, tone, previous discussion, and brand guidelines shared during this conversation.
-3. When the user asks you to write, create, or schedule a post, provide the conversational explanation AND ALSO include a JSON block marked with \`\`\`json containing the structured post data so the user can schedule it in 1-click.
+3. Treat Meta Ads as a campaign-drafting channel only. Never say that a campaign was created, launched, or spent budget; no campaign publishing flow is connected.
+${outputInstructions}
 
-STRUCTURED POST FORMAT:
-When suggesting a post ready for scheduling, include:
-\`\`\`json
-{
-  "action": "schedule_post",
-  "platforms": ${JSON.stringify(activeChannels.length > 0 ? activeChannels : ["youtube"])},
-  "title": "A captivating, clickable title or headline",
-  "description": "The complete post text, formatted with clean line breaks and emojis",
-  "tags": "relevant, comma, separated, hashtags"
-}
-\`\`\`
+${structuredPostInstructions}
 
 PREVIOUS CONVERSATION HISTORY (Remember these past messages):
 ${formattedHistory ? formattedHistory : "None (this is the start of the conversation)"}
@@ -181,16 +192,23 @@ ${formattedHistory ? formattedHistory : "None (this is the start of the conversa
       try {
         const parsedJson = JSON.parse(jsonMatch[1]);
         
-        const normalizeProposal = (item) => ({
-          platforms: Array.isArray(item.platforms) && item.platforms.length > 0
-            ? item.platforms
-            : (activeChannels.length > 0 ? activeChannels : ["youtube"]),
-          title: item.title || "",
-          description: item.description || "",
-          tags: item.tags || "",
-        });
+        const normalizeProposal = (item) => {
+          const platforms = Array.isArray(item.platforms)
+            ? item.platforms.filter((platform) => platform !== "meta_ads")
+            : [];
+          return {
+            platforms: platforms.length > 0
+              ? platforms
+              : (scheduleableChannels.length > 0 ? scheduleableChannels : ["youtube"]),
+            title: item.title || "",
+            description: item.description || "",
+            tags: item.tags || "",
+          };
+        };
 
-        if (Array.isArray(parsedJson) && parsedJson.length > 0) {
+        if (metaOnlySelected) {
+          cleanedReply = rawOutput.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
+        } else if (Array.isArray(parsedJson) && parsedJson.length > 0) {
           postProposals = parsedJson.map(normalizeProposal);
           postProposal = postProposals[0];
           // Remove the raw JSON block from the conversational reply
@@ -208,7 +226,9 @@ ${formattedHistory ? formattedHistory : "None (this is the start of the conversa
 
     return NextResponse.json({
       success: true,
-      reply: cleanedReply || rawOutput,
+      reply: cleanedReply || (metaOnlySelected
+        ? "Meta Ads campaign drafts are available, but campaign creation and launch are not connected."
+        : rawOutput),
       postProposal,
       postProposals,
       threadId,

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { FaYoutube, FaInstagram, FaFacebook, FaLinkedin, FaPinterest } from "react-icons/fa";
+import { FaYoutube, FaInstagram, FaFacebook, FaLinkedin, FaPinterest, FaBullhorn } from "react-icons/fa";
 import { FaXTwitter, FaThreads } from "react-icons/fa6";
 import { SiTiktok } from "react-icons/si";
 import { FiEdit2, FiTrash2, FiCheck, FiPlus, FiX, FiRefreshCw, FiAlertTriangle } from "react-icons/fi";
@@ -54,6 +54,15 @@ const PLATFORMS = [
     comingSoon: false,
   },
   {
+    key: "meta_ads",
+    platformId: 9,
+    name: "Meta Ads",
+    Icon: FaBullhorn,
+    iconColor: "text-blue-500",
+    description: "Connect Meta ad accounts and draft campaign concepts. This does not create or launch campaigns.",
+    comingSoon: false,
+  },
+  {
     key: "linkedin",
     platformId: 6,
     name: "LinkedIn",
@@ -83,9 +92,14 @@ const PLATFORMS = [
 ];
 
 export default function IntegrationsPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [metaConnection, setMetaConnection] = useState({ connected: false, authorizationRequired: true, accounts: [] });
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaConnecting, setMetaConnecting] = useState(false);
+  const [metaDisconnecting, setMetaDisconnecting] = useState(false);
+  const [metaError, setMetaError] = useState("");
   
   // Connect / Rename states
   const [connectingPlatform, setConnectingPlatform] = useState(null);
@@ -110,22 +124,15 @@ export default function IntegrationsPage() {
     const localRequested = localStorage.getItem("requested_platforms");
     if (localRequested) {
       try {
-        setRequestedPlatforms(JSON.parse(localRequested));
+        const storedPlatforms = JSON.parse(localRequested);
+        queueMicrotask(() => setRequestedPlatforms(Array.isArray(storedPlatforms) ? storedPlatforms : []));
       } catch (e) {
-        setRequestedPlatforms([]);
+        queueMicrotask(() => setRequestedPlatforms([]));
       }
     }
   }, []);
 
-  useEffect(() => {
-    if (session?.user) {
-      fetchAccounts();
-    } else {
-      setLoading(false);
-    }
-  }, [session]);
-
-  const fetchAccounts = () => {
+  const fetchAccounts = useCallback(() => {
     setLoading(true);
     fetch("/api/social/accounts")
       .then((res) => res.json())
@@ -164,11 +171,89 @@ export default function IntegrationsPage() {
       })
       .catch((err) => console.error("Failed to load accounts:", err))
       .finally(() => setLoading(false));
+  }, [session]);
+
+  const fetchMetaAccounts = useCallback(async () => {
+    if (!session?.user) return;
+    setMetaLoading(true);
+    setMetaError("");
+    try {
+      const response = await fetch("/api/meta/ad-accounts", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not load Meta ad accounts.");
+      setMetaConnection({
+        connected: Boolean(data.connected),
+        authorizationRequired: Boolean(data.authorizationRequired),
+        accounts: Array.isArray(data.accounts) ? data.accounts : [],
+      });
+    } catch (error) {
+      setMetaError(error.message || "Could not load Meta ad accounts.");
+    } finally {
+      setMetaLoading(false);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      queueMicrotask(() => {
+        fetchAccounts();
+        fetchMetaAccounts();
+      });
+    }
+  }, [status, fetchAccounts, fetchMetaAccounts]);
+
+  const startMetaAuthorization = async () => {
+    const embedded = window.self !== window.top;
+    const authWindow = embedded ? window.open("about:blank", "_blank") : null;
+    if (authWindow) authWindow.opener = null;
+
+    setMetaConnecting(true);
+    setMetaError("");
+    try {
+      const response = await fetch("/api/meta/connect", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Meta authorization could not be started.");
+      }
+
+      if (embedded) {
+        if (!authWindow) throw new Error("Allow pop-ups for this preview and try connecting again.");
+        authWindow.location.replace(data.url);
+      } else {
+        window.location.assign(data.url);
+      }
+    } catch (error) {
+      authWindow?.close();
+      setMetaError(error.message || "Meta authorization could not be started.");
+    } finally {
+      setMetaConnecting(false);
+    }
+  };
+
+  const handleMetaDisconnect = async () => {
+    if (!confirm("Disconnect Meta Ads for this account? This will remove its saved authorization.")) return;
+    setMetaDisconnecting(true);
+    setMetaError("");
+    try {
+      const response = await fetch("/api/meta/connect", { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Meta Ads could not be disconnected.");
+      setMetaConnection({ connected: false, authorizationRequired: true, accounts: [] });
+      fetchAccounts();
+    } catch (error) {
+      setMetaError(error.message || "Meta Ads could not be disconnected.");
+    } finally {
+      setMetaDisconnecting(false);
+    }
   };
 
   const handleConnect = (platform) => {
     if (!session) {
       signIn("google");
+      return;
+    }
+    if (platform.key === "meta_ads") {
+      startMetaAuthorization();
       return;
     }
     setAccountNameInput("");
@@ -356,8 +441,8 @@ export default function IntegrationsPage() {
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h1>
             {session?.user && (
               <button
-                onClick={fetchAccounts}
-                disabled={loading}
+                onClick={() => { fetchAccounts(); fetchMetaAccounts(); }}
+                disabled={loading || metaLoading}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 <FiRefreshCw className={loading ? "animate-spin" : ""} />
@@ -366,7 +451,7 @@ export default function IntegrationsPage() {
             )}
           </div>
           <p className="text-xs text-zinc-600 dark:text-zinc-400">
-            Connect your social media accounts to publish content directly.
+            Connect social accounts to publish content, or link Meta ad accounts for campaign drafts.
           </p>
         </div>
 
@@ -393,7 +478,8 @@ export default function IntegrationsPage() {
         <div className="flex flex-col gap-4">
           {PLATFORMS.map((platform) => {
             const { key, platformId, name, Icon, iconColor, description, comingSoon, requestAccess } = platform;
-            const connected = getAccountsForPlatform(platformId, key);
+            const isMetaAds = key === "meta_ads";
+            const connected = isMetaAds ? metaConnection.accounts : getAccountsForPlatform(platformId, key);
             const requested = requestedPlatforms.includes(name);
             const requestCount = interestCounts[name] || 0;
 
@@ -419,13 +505,28 @@ export default function IntegrationsPage() {
                   </div>
 
                   {!comingSoon ? (
-                    <button
-                      onClick={() => handleConnect(platform)}
-                      disabled={!session}
-                      className="px-3.5 py-1.5 bg-[#612bd3] hover:bg-[#7237e8] disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <FiPlus /> Connect
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isMetaAds && metaConnection.connected && (
+                        <button
+                          onClick={handleMetaDisconnect}
+                          disabled={metaDisconnecting}
+                          className="px-3 py-1.5 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-red-600 dark:hover:text-red-400 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {metaDisconnecting ? "Disconnecting…" : "Disconnect"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleConnect(platform)}
+                        disabled={!session || (isMetaAds && metaConnecting)}
+                        className="px-3.5 py-1.5 bg-[#612bd3] hover:bg-[#7237e8] disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isMetaAds ? (
+                          metaConnecting ? "Opening Meta…" : metaConnection.connected ? "Reconnect" : "Connect Meta Ads"
+                        ) : (
+                          <><FiPlus /> Connect</>
+                        )}
+                      </button>
+                    </div>
                   ) : (
                     requestAccess && (
                       <button
@@ -452,12 +553,12 @@ export default function IntegrationsPage() {
                 {/* Account list section */}
                 {!comingSoon && session && (
                   <div className="border-t border-zinc-200 dark:border-[#252525] pt-3 flex flex-col gap-2">
-                    {loading ? (
+                    {status === "loading" || loading || (isMetaAds && metaLoading) ? (
                       <div className="h-10 w-full bg-zinc-100 dark:bg-zinc-900/60 rounded-lg animate-pulse" />
                     ) : connected.length > 0 ? (
                       connected.map((acc) => (
                         <div key={acc.id} className="bg-zinc-50 dark:bg-zinc-900/50 rounded-lg px-4 py-2.5 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 truncate">
+                          <div className="flex min-w-0 flex-col gap-0.5">
                             {renamingId === acc.id ? (
                               <input
                                 autoFocus
@@ -470,15 +571,24 @@ export default function IntegrationsPage() {
                                 className="px-2 py-0.5 text-xs bg-white dark:bg-zinc-950 border border-[#612bd3] rounded outline-none text-slate-900 dark:text-white w-44"
                               />
                             ) : (
-                              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200 truncate">
-                                {acc.account_name || `${name} Account`}
-                              </span>
+                              <>
+                                <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200 truncate">
+                                  {acc.account_name || `${name} Account`}
+                                </span>
+                                {isMetaAds && (
+                                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                                    Ad account ID: {acc.platform_user_id}
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
 
                           {/* Account management buttons */}
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {renamingId === acc.id ? (
+                            {isMetaAds ? (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Connected</span>
+                            ) : renamingId === acc.id ? (
                               <>
                                 <button
                                   onClick={() => saveRename(acc.id)}
@@ -518,7 +628,14 @@ export default function IntegrationsPage() {
                         </div>
                       ))
                     ) : (
-                      <span className="text-xs text-zinc-500">No accounts connected yet.</span>
+                      <span className="text-xs text-zinc-500">
+                        {isMetaAds && metaConnection.connected
+                          ? "Meta is connected, but no ad accounts are available to this user."
+                          : "No accounts connected yet."}
+                      </span>
+                    )}
+                    {isMetaAds && metaError && (
+                      <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{metaError}</p>
                     )}
                   </div>
                 )}
