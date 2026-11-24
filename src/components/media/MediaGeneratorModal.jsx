@@ -25,12 +25,68 @@ const VIDEO_ASPECT_RATIOS = [
   { value: "1_1", label: "Square · 1:1" },
 ];
 
+function suggestBrandText(prompt) {
+  const match = prompt.match(/\bfor\s+([a-z0-9&'’ -]{2,60}?)(?:\s+(?:with|using|in|at|on|and)\b.*)?[.!?]*$/i);
+  return match?.[1]?.trim().replace(/[.!?]+$/, "") || "";
+}
+
+function addBrandText(dataUrl, text) {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Could not prepare the generated image."));
+        return;
+      }
+
+      context.drawImage(image, 0, 0);
+      if (text) {
+        const panelHeight = Math.round(canvas.height * 0.2);
+        const panelTop = canvas.height - panelHeight;
+        const gradient = context.createLinearGradient(0, panelTop, 0, canvas.height);
+        gradient.addColorStop(0, "rgba(15, 18, 18, 0.56)");
+        gradient.addColorStop(1, "rgba(15, 18, 18, 0.78)");
+        context.fillStyle = gradient;
+        context.fillRect(0, panelTop, canvas.width, panelHeight);
+
+        context.fillStyle = "rgba(224, 197, 155, 0.95)";
+        context.fillRect(canvas.width * 0.44, panelTop + panelHeight * 0.28, canvas.width * 0.12, Math.max(2, canvas.height * 0.003));
+
+        let fontSize = Math.round(canvas.height * 0.065);
+        const maxWidth = canvas.width * 0.84;
+        do {
+          context.font = `500 ${fontSize}px Georgia, serif`;
+          if (context.measureText(text).width <= maxWidth || fontSize <= 18) break;
+          fontSize -= 2;
+        } while (fontSize > 18);
+
+        context.fillStyle = "#fffaf2";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.shadowColor = "rgba(0, 0, 0, 0.2)";
+        context.shadowBlur = canvas.height * 0.01;
+        context.fillText(text, canvas.width / 2, panelTop + panelHeight * 0.62, maxWidth);
+      }
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => reject(new Error("Could not prepare the generated image."));
+    image.src = dataUrl;
+  });
+}
+
 export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
   const [mode, setMode] = useState("image");
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("square");
   const [resolution, setResolution] = useState("480p");
   const [frames, setFrames] = useState(25);
+  const [brandText, setBrandText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
@@ -50,6 +106,9 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
       return;
     }
 
+    const title = mode === "image" ? (brandText.trim() || suggestBrandText(prompt)) : "";
+    if (title) setBrandText(title);
+
     setGenerating(true);
     setResult(null);
     try {
@@ -60,7 +119,14 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Generation failed.");
-      setResult(payload);
+      const dataUrl = mode === "image" && title
+        ? await addBrandText(payload.dataUrl, title)
+        : payload.dataUrl;
+      setResult({
+        ...payload,
+        dataUrl,
+        ...(mode === "image" && title ? { mimeType: "image/png", fileExtension: "png" } : {}),
+      });
     } catch (error) {
       toast.error(error.message || "Could not generate media.");
     } finally {
@@ -113,6 +179,7 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
   const handleClose = () => {
     if (generating || saving) return;
     setPrompt("");
+    setBrandText("");
     setResult(null);
     onClose();
   };
@@ -186,6 +253,21 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
                 <div className="flex items-end rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">Model: FLUX.2 Klein 4B</div>
               )}
             </div>
+
+            {mode === "image" && (
+              <div>
+                <label htmlFor="generation-brand-text" className="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Exact brand or headline text <span className="font-normal text-zinc-500">(optional)</span></label>
+                <input
+                  id="generation-brand-text"
+                  value={brandText}
+                  onChange={(event) => setBrandText(event.target.value)}
+                  maxLength={60}
+                  placeholder="e.g. Relaxio Spa"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#612bd3] focus:ring-2 focus:ring-[#612bd3]/15 dark:border-zinc-700 dark:bg-[#101012] dark:text-white dark:placeholder:text-zinc-500"
+                />
+                <p className="mt-1 text-[11px] text-zinc-500">We keep the generated artwork text-free and render this copy sharply on top.</p>
+              </div>
+            )}
 
             <p className="text-[11px] text-zinc-500">NVIDIA free access and rate limits depend on your account; availability is not guaranteed.</p>
 

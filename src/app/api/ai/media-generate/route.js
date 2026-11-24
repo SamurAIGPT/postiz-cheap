@@ -16,6 +16,16 @@ const VIDEO_RESOLUTIONS = {
   "720p": { size: "720", maxFrames: 197 },
 };
 
+function buildImagePrompt(prompt) {
+  return [
+    "Create a polished, professional social-media campaign visual based on the brief below.",
+    "Preserve the requested subject, industry, mood, and visual style. Use deliberate composition, balanced negative space, coherent lighting, refined colors, clean edges, and high detail.",
+    "For template or advertisement requests, keep the lower 20% uncluttered for a separately-rendered title.",
+    "Do not draw text, letters, words, logos, watermarks, typography, pseudo-writing, or letter-like marks.",
+    `Visual brief: ${prompt}`,
+  ].join(" ");
+}
+
 async function parseProviderResponse(response) {
   const text = await response.text();
   let payload;
@@ -77,7 +87,7 @@ export async function POST(request) {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify({ prompt, width, height, steps: 4 }),
+          body: JSON.stringify({ prompt: buildImagePrompt(prompt), width, height, steps: 4 }),
           signal: controller.signal,
         });
         const result = await parseProviderResponse(response);
