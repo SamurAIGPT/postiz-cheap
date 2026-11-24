@@ -702,9 +702,9 @@ export default function AgentWorkspace() {
   }
 
   return (
-    <div className="h-full w-full bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors">
+    <div className="h-full min-h-0 w-full bg-[#f8f9fa] dark:bg-[#141414] text-zinc-900 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors">
       {/* 3-Panel Main Layout */}
-      <div className="flex-1 h-full min-h-0 flex overflow-hidden divide-x divide-zinc-200 dark:divide-[#252525]">
+      <div className="flex-1 min-h-0 flex overflow-hidden divide-x divide-zinc-200 dark:divide-[#252525]">
         
         {/* ========================================================= */}
         {/* LEFT SIDEBAR: Select Channels (w-[230px])                  */}
@@ -788,7 +788,7 @@ export default function AgentWorkspace() {
         {/* ========================================================= */}
         {/* CENTER PANEL: Agent Chat                                  */}
         {/* ========================================================= */}
-        <main className="flex-1 h-full min-h-0 flex flex-col bg-[#f8f9fa] dark:bg-[#141414] overflow-hidden relative transition-colors">
+        <main className="flex-1 min-w-0 min-h-0 grid grid-rows-[auto_minmax(0,1fr)_auto_auto] bg-[#f8f9fa] dark:bg-[#141414] overflow-hidden relative transition-colors">
           {/* Top Bar */}
           <div className="shrink-0 px-4 py-2.5 border-b border-zinc-200 dark:border-[#252525] bg-white dark:bg-[#161515] flex items-center justify-between transition-colors">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -864,7 +864,7 @@ export default function AgentWorkspace() {
           </div>
 
           {/* Messages Scroll Area */}
-          <div className="flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-3.5 scrollbar-subtle">
+          <div aria-live="polite" className="min-h-0 p-4 sm:p-5 overflow-y-auto flex flex-col gap-3.5 scrollbar-subtle">
             {messages.map((msg) => {
               const isUser = msg.role === "user";
               const copyText = sanitizeText(msg.content);
