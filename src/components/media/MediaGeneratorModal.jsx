@@ -1,7 +1,8 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import {
   FiDownload,
@@ -80,8 +81,9 @@ function addBrandText(dataUrl, text) {
   });
 }
 
-export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
+export default function MediaGeneratorModal({ isOpen, onClose, onSaved, agentModel = "" }) {
   const [mode, setMode] = useState("image");
+  const [connectedModel, setConnectedModel] = useState(agentModel);
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("square");
   const [resolution, setResolution] = useState("480p");
@@ -90,6 +92,22 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (agentModel) {
+        setConnectedModel(agentModel);
+        return;
+      }
+      if (isOpen) {
+        try {
+          setConnectedModel(sessionStorage.getItem("social_agent_model") || "");
+        } catch {
+          setConnectedModel("");
+        }
+      }
+    });
+  }, [agentModel, isOpen]);
 
   if (!isOpen) return null;
 
@@ -101,6 +119,10 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
 
   const handleGenerate = async (event) => {
     event.preventDefault();
+    if (!connectedModel) {
+      toast.error("Connect a free model in the Agent workspace first.");
+      return;
+    }
     if (!prompt.trim()) {
       toast.error("Enter a prompt to generate media.");
       return;
@@ -271,6 +293,13 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
 
             <p className="text-[11px] text-zinc-500">NVIDIA free access and rate limits depend on your account; availability is not guaranteed.</p>
 
+            {!connectedModel && (
+              <div role="status" className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+                <span>Connect the free AI model before generating media for your agent.</span>
+                <Link href="/agents" onClick={handleClose} className="font-semibold underline underline-offset-2">Open Agent workspace</Link>
+              </div>
+            )}
+
             {mode === "video" && (
               <div>
                 <label htmlFor="video-frames" className="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Clip length</label>
@@ -283,7 +312,7 @@ export default function MediaGeneratorModal({ isOpen, onClose, onSaved }) {
               </div>
             )}
 
-            <button type="submit" disabled={generating || saving || !prompt.trim()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#612bd3] px-4 py-3 text-sm font-bold text-white shadow-sm shadow-[#612bd3]/20 transition hover:bg-[#7237e8] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={generating || saving || !prompt.trim() || !connectedModel} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#612bd3] px-4 py-3 text-sm font-bold text-white shadow-sm shadow-[#612bd3]/20 transition hover:bg-[#7237e8] disabled:cursor-not-allowed disabled:opacity-60">
               {generating ? <><FiLoader className="animate-spin" aria-hidden="true" /> Generating…</> : <><FiImage aria-hidden="true" /> Generate {mode}</>}
             </button>
           </form>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
+import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
+import { AGENT_MODEL_COOKIE, getConnectedAgentModel } from "@/lib/agent-model-connection";
 
 export const maxDuration = 300;
 
@@ -54,12 +56,19 @@ export async function POST(request) {
       return NextResponse.json({ error: "Please sign in to generate media." }, { status: 401 });
     }
 
+    const cookieStore = await cookies();
+    const connectedModel = getConnectedAgentModel(cookieStore.get(AGENT_MODEL_COOKIE)?.value, session.user);
+    if (!connectedModel) {
+      return NextResponse.json({ error: "Connect a free AI model in the Agent workspace before generating media." }, { status: 403 });
+    }
+
     const apiKey = process.env.NVIDIA_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "NVIDIA_API_KEY is not configured." }, { status: 503 });
+      return NextResponse.json({ error: "NVIDIA media generation is not configured." }, { status: 503 });
     }
 
     const body = await request.json();
+
     const mode = body.mode;
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
 

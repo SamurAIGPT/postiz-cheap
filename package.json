@@ -14,6 +14,7 @@
     "@prisma/client": "^7.8.0",
     "@stripe/stripe-js": "^9.6.0",
     "@vercel/connect": "^2.9.5",
+    "ai": "^7.0.181",
     "axios": "^1.16.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.39.0",
